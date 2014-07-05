@@ -46,8 +46,6 @@ any such mod.  I've been working in kOS mostly, but I didn't want this
 part to be kOS-specific because there's no particular reason it has
 to be.
 
-![LaserDist screenshot 1](readme_screenshot1.png)
-
 ### How do I use it from my script then?
 
 That hasn't been written yet.  I figured I'd make the part first, and
