@@ -4,6 +4,26 @@ LaserDist
 [WIP, Plugin, Parts] LaserDist 0.1 for KSP 0.23.5, Alpha
 --------------------------------------------------------
 
+Releases:
+
+* TODO
+
+ZIP Download:
+
+* TODO
+
+Source Code Hosting site:
+
+* https://github.com/Dunbaratu/LaserDist
+
+License:
+
+* GPL v3
+
+Copyright (C) 2014 Steven Mading (aka Dunbaratu on Github)
+madings@gmail.com
+
+
 This is a vey small plugin.  It makes a KSP Part that
 measures straight line distances by laser.
 
@@ -61,6 +81,14 @@ take care to mount it somewhere where the laser beam will have a clear
 line of sight without obstruction.  Even exhaust plumes can block it,
 as they disrupt the beam enough to make the instrument fail to see 
 through the plume.
+
+### Distance Limitation
+
+The distance for measuring terrain polygons can't be higher than about 30000m
+or so on Kerbin, as that's the altitude at which Unity starts to unload
+the terrain hieght information.  The max distance changes depending on
+which planet you're on.
+
 
 ### How do I use it from my script then?
 

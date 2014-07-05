@@ -89,7 +89,7 @@ namespace LaserDist
         [KSPEvent(guiActive=true, guiName = "Toggle", active = true)]
         public void ToggleActive()
         {
-            activated = ! drawLaser;
+            activated = ! activated;
             ChangeIsDrawing();
         }
         [KSPAction("toggle")]
@@ -195,7 +195,7 @@ namespace LaserDist
         {
             float newDist = -1f;
             hitName = "<none>";
-            if( isEnabled )
+            if( activated )
             {
                 origin = this.part.transform.TransformPoint( relLaserOrigin );
                 pointing = this.part.transform.rotation * Vector3d.down;
@@ -207,7 +207,7 @@ namespace LaserDist
                     
                     // Walk up the UnityGameObject tree trying to find an object that is
                     // something the user will be familiar with:
-                    GameObject hitObject = hit.collider.gameObject;
+                    GameObject hitObject = hit.transform.gameObject;
                     if( hitObject != null )
                     {
                         hitName = hitObject.name; // default if the checks below don't work.

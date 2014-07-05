@@ -14,7 +14,7 @@ If you edit this, keep the following in mind:
 
 2. Currently the place where the part attaches to the parent part is:
 
-   xyz(-0.025, 0.0, 0.0), direction negative X axis.
+   xyz(-0.075, 0.0, 0.0), direction negative X axis.
 
 If you change this, please edit the part.cfg file's node_attach setting
 to match the change.
