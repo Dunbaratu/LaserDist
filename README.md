@@ -46,6 +46,22 @@ any such mod.  I've been working in kOS mostly, but I didn't want this
 part to be kOS-specific because there's no particular reason it has
 to be.
 
+### How to Mount it.
+
+![icon of Electronics node](http://wiki.kerbalspaceprogram.com/w/images/d/dd/Electronics.png). The Beamer 100x Dist-o-Meter is located in the "Electronics" tech node of the career tech tree. It's a 300-point node on the tree so you might not have it yet in a new fresh career game.
+
+The Laser can be mounted anywhere as a surface-mount item.  Take care to
+note the orientation of the laser emiiter.  (KSP lets you fine-tune
+the rotation of a part by using the SHIFT key while you hit the WASDQE
+keys.)
+
+The Laser will bounce back and give you a distance measurement when
+it encounters *ANY* object, including parts of your own craft.  So
+take care to mount it somewhere where the laser beam will have a clear
+line of sight without obstruction.  Even exhaust plumes can block it,
+as they disrupt the beam enough to make the instrument fail to see 
+through the plume.
+
 ### How do I use it from my script then?
 
 That hasn't been written yet.  I figured I'd make the part first, and
