@@ -22,7 +22,7 @@ pointed when you mounted it on the craft, as demonstrated here:
 ### Why?
 
 The intended purpose of this part is to be used in conjunction with
-the scripted autopilot [kOS](https://github.com/KSP-KOS/KOS), to
+the scripted autopilot [kOS](https://github.com/KSP-KOS/KOS/releases), to
 provide a way to for you to write scripted pilot software that can
 see the distance to the ground (or anything else like a ship) along
 the laser line.  The reason this can be useful is so you can detect
