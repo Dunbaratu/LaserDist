@@ -6,11 +6,9 @@ LaserDist
 
 Releases:
 
-* TODO
+* https://github.com/Dunbaratu/LaserDist/releases
 
-ZIP Download:
-
-* TODO
+ZIP Download (See release page above):
 
 Source Code Hosting site:
 
