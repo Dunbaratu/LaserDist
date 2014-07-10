@@ -39,20 +39,40 @@ namespace LaserDist
         ///   Laser's pointing unit vector in Unity World coords:
         /// </summary>
         Vector3d pointing;
+        
+        /// <summary>
+        /// The utility that solves raycasts for this laser.
+        /// </summary>
+        private LaserPQSUtil pqsTool;
 
         private bool isDrawing = false;
         
-        GameObject lineObj = null;
-        LineRenderer line = null;
-        float maxDrawDist = 10000f;
-        
+        private GameObject lineObj = null;
+        private LineRenderer line = null;
+        private Int32 mask;
+        private int maskBitDefault = 0;
+        private int maskTransparentFX = 1;
+        private int maskBitWater = 3;
+        private int maskBitPartsList = 8;
+        private int maskBitScaledScenery = 10;
+        private int maskBitLocalScenery = 15;
+        private int maskBitKerbals = 16;
+        private int maskBitDisconnectedParts = 19;
+        private int maskBitPartTriggers= 21;
+        private int maskBitWheelColliders = 27;
+        private int maskBitTerrainCollidres = 28;
+
         /// <summary>Distance the laser is showing to the first collision:</summary>
-        [KSPField(isPersistant=true, guiName = "Distance", guiActive = true)]
+        [KSPField(isPersistant=true, guiName = "Distance", guiActive = true, guiUnits = "m")]
         public float distance = 0.0f;
 
         /// <summary>Name of thing the laser is hitting:</summary>
         [KSPField(isPersistant=true, guiName = "Hit", guiActive = true)]
         public string hitName = "<none>";
+
+        /// <summary>Distance the laser is showing to the first collision:</summary>
+        [KSPField(isPersistant=true, guiName = "Max Sensor Range", guiActive = true, guiUnits = "m")]
+        public float maxDistance = 10000f;        
 
         /// <summary>Flag controlling whether or not to see the laserbeam onscreen</summary>
         [KSPField(isPersistant=true, guiName = "Laser Visibility", guiActive = true)]
@@ -70,18 +90,30 @@ namespace LaserDist
         {
             moduleName = "LaserDistModule";
             relLaserOrigin = new Vector3d(0.0,-0.3,0.0);
+            pqsTool = new LaserPQSUtil();
+            
+            mask =  (1 << maskBitDefault)
+                    + (1 << maskBitWater)
+                    + (1 << maskBitPartsList)
+                    // + (1 << maskBitScaledScenery) // seems to be the map scenery and it finds hits when not on mapview.
+                    + (1 << maskBitLocalScenery)
+                    + (1 << maskBitKerbals)
+                    + (1 << maskBitDisconnectedParts)
+                    + (1 << maskBitPartTriggers)
+                    + (1 << maskBitWheelColliders)
+                    + (1 << maskBitTerrainCollidres) ;
         }
 
         // Actions to control the active flag:
         // ----------------------------------------
         [KSPAction("activate")]
-        public void ActiveOn()
+        public void ActiveOn(KSPActionParam p)
         {
             activated = true;
             ChangeIsDrawing();
         }
         [KSPAction("deactivate")]
-        public void ActiveOff()
+        public void ActiveOff(KSPActionParam p)
         {
             activated = false;
             ChangeIsDrawing();
@@ -101,13 +133,13 @@ namespace LaserDist
         // Actions to control the visibility flag:
         // ----------------------------------------
         [KSPAction("activate visibility")]
-        public void VisibilityOn()
+        public void VisibilityOn(KSPActionParam p)
         {
             drawLaser = true;
             ChangeIsDrawing();
         }
         [KSPAction("deactivate visibility")]
-        public void VisibilityOff()
+        public void VisibilityOff(KSPActionParam p)
         {
             drawLaser = false;
             ChangeIsDrawing();
@@ -150,6 +182,8 @@ namespace LaserDist
         private void startDrawing()
         {
             lineObj = new GameObject("laser line");
+            lineObj.layer = maskTransparentFX;
+
             line = lineObj.AddComponent<LineRenderer>();
             
             line.material = new Material(Shader.Find("Particles/Additive") );
@@ -201,7 +235,7 @@ namespace LaserDist
                 pointing = this.part.transform.rotation * Vector3d.down;
 
                 RaycastHit hit;
-                if( Physics.Raycast(origin, pointing, out hit) )
+                if( Physics.Raycast(origin, pointing, out hit, maxDistance, mask) )
                 {
                     newDist = hit.distance;
                     
@@ -210,6 +244,7 @@ namespace LaserDist
                     GameObject hitObject = hit.transform.gameObject;
                     if( hitObject != null )
                     {
+                        UnityEngine.Debug.Log( "Raycast Hit: layer = " + hitObject.layer );
                         hitName = hitObject.name; // default if the checks below don't work.
 
                         // Despite the name and what the Unity documentation says,
@@ -233,6 +268,18 @@ namespace LaserDist
                                 hitName = part.name;
                             }
                         }
+                        hitName = Convert.ToString(hitObject.layer) + ": " + hitObject; // eraseme
+                    }
+                }
+                if( newDist < 0 )
+                {
+                    // Try a hit a different way - using the PQS solver:
+                    string pqsName;
+                    double pqsDist;
+                    if( pqsTool.RayCast( origin, pointing, out pqsName, out pqsDist ) )
+                    {
+                        hitName = pqsName;
+                        newDist = (float) pqsDist;
                     }
                 }
             }
@@ -253,7 +300,7 @@ namespace LaserDist
                 line.SetVertexCount(2);
                 line.SetWidth( width, width );
                 line.SetPosition( 0, origin );
-                line.SetPosition( 1, origin + pointing*( (distance>0)?distance:maxDrawDist ) );
+                line.SetPosition( 1, origin + pointing*( (distance>0)?distance:maxDistance ) );
             }
         }
     }
