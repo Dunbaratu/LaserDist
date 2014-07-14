@@ -34,16 +34,37 @@ namespace LaserDist
             // nearer of those hits.)
             foreach( CelestialBody body in bodies )
             {
-                UnityEngine.Debug.Log( "eraseme: Looking for hit with body " + body.GetName() );
-                if( body.pqsController != null &&
-                    body.pqsController.RayIntersection( origin, rayVec, out hitDist ) )
+                UnityEngine.Debug.Log( "eraseme: X Looking for hit with body " + body.GetName() );
+                PQS pqs = body.pqsController;
+                if( pqs != null )
                 {
-                    UnityEngine.Debug.Log( "eraseme:   Hit found, distance = " + hitDist );
-                    if( bestHitDist < 0 || bestHitDist > hitDist )
+                    // PQS.RayIntersection() finds false hits on the backside of
+                    // the planet when you are faced away from the planet.  To filter the
+                    // false hits out, the only hits that count are ones with an acute angle
+                    // between the raycast and the ray to the center of the planet:
+                    double ang = Vector3d.Angle( rayVec, (body.position - origin) );
+
+                    if( ang < 90 )
                     {
-                        UnityEngine.Debug.Log( "eraseme:      Hit is better than prev." );
-                        bestHitDist = hitDist;
-                        bestHitName = body.GetName();
+                        // This next line is needed because of what I believe to be a bug in
+                        // KSP's PQS.RayIntersection method.  It appears to be rotating
+                        // the input direction vector once the wrong way for its calculations,
+                        // making it necessary to rotate it twice the correct way to compensate
+                        // for the fact that it insists on rotating it the wrong way.  If a new
+                        // release of KSP ever fixes this bug, then this next line will have to be
+                        // edited.  That's why this long comment is here.  Please don't remove it.
+                        Vector3d useRayVec = pqs.transformRotation * ( pqs.transformRotation * rayVec );
+
+                        if( pqs.RayIntersection( origin, useRayVec, out hitDist ) )
+                        {
+                            UnityEngine.Debug.Log( "eraseme:   Hit found, distance = " + hitDist );
+                            if( bestHitDist < 0 || bestHitDist > hitDist )
+                            {
+                                UnityEngine.Debug.Log( "eraseme:      Hit is better than prev." );
+                                bestHitDist = hitDist;
+                                bestHitName = body.GetName();
+                            }
+                        }
                     }
                 }
             }

@@ -39,6 +39,15 @@ namespace LaserDist
         ///   Laser's pointing unit vector in Unity World coords:
         /// </summary>
         Vector3d pointing;
+
+        /// <summary>
+        ///   Laser's origin in the map view's coords:
+        /// </summary>
+        Vector3d mapOrigin;
+        /// <summary>
+        ///   Laser's pointing unit vector in the map view's coords:
+        /// </summary>
+        Vector3d mapPointing;
         
         /// <summary>
         /// The utility that solves raycasts for this laser.
@@ -46,6 +55,7 @@ namespace LaserDist
         private LaserPQSUtil pqsTool;
 
         private bool isDrawing = false;
+        private bool isOnMap = false;
         
         private GameObject lineObj = null;
         private LineRenderer line = null;
@@ -182,6 +192,7 @@ namespace LaserDist
         private void startDrawing()
         {
             lineObj = new GameObject("laser line");
+            isOnMap = MapView.MapIsEnabled;
             lineObj.layer = maskTransparentFX;
 
             line = lineObj.AddComponent<LineRenderer>();
@@ -234,6 +245,10 @@ namespace LaserDist
                 origin = this.part.transform.TransformPoint( relLaserOrigin );
                 pointing = this.part.transform.rotation * Vector3d.down;
 
+                // the points on the map-space corresponding to these points is different:
+                mapOrigin = ScaledSpace.LocalToScaledSpace( origin );
+                mapPointing = pointing;
+
                 RaycastHit hit;
                 if( Physics.Raycast(origin, pointing, out hit, maxDistance, mask) )
                 {
@@ -268,18 +283,28 @@ namespace LaserDist
                                 hitName = part.name;
                             }
                         }
-                        hitName = Convert.ToString(hitObject.layer) + ": " + hitObject; // eraseme
                     }
                 }
-                if( newDist < 0 )
+                // If the hit is not found, or it is found but is far enough
+                // away that it might be on the other side of the planet, seen
+                // through the ocean (which has no collider so raycasts pass
+                // through it), then try the more expensive pqs ray cast solver.
+                if( newDist < 0 || newDist > 100000 )
                 {
-                    // Try a hit a different way - using the PQS solver:
+                    // Try a hit a different way - using the PQS solver.  The pqs solver
+                    // operates in map view coords even when the game is in flight camera
+                    // mode.  (Both flight and map drawings always exist in Unity at the same
+                    // time, but some are masked off depending on view mode.)
                     string pqsName;
                     double pqsDist;
-                    if( pqsTool.RayCast( origin, pointing, out pqsName, out pqsDist ) )
+                    if( pqsTool.RayCast( mapOrigin, mapPointing, out pqsName, out pqsDist ) )
                     {
-                        hitName = pqsName;
-                        newDist = (float) pqsDist;
+                        // If it's a closer hit than we have already, then use it:
+                        if( pqsDist < newDist || newDist < 0 )
+                        {
+                            hitName = pqsName;
+                            newDist = (float) pqsDist;
+                        }
                     }
                 }
             }
@@ -293,14 +318,34 @@ namespace LaserDist
         /// </summary>
         private void drawUpdate()
         {
+            isOnMap = MapView.MapIsEnabled;
             if( isDrawing )
             {
+                Vector3d useOrigin;
+                Vector3d usePointing;
+                /*
+                if( isOnMap )
+                {
+                    lineObj.layer = maskBitScaledScenery;
+                    useOrigin = mapOrigin;
+                    usePointing = mapPointing;
+                }
+                else
+                {
+                */
+                    lineObj.layer =  maskTransparentFX;
+                    useOrigin = origin;
+                    usePointing = pointing;
+                /*
+                }
+                */
+
                 float width = 0.02f;
 
                 line.SetVertexCount(2);
                 line.SetWidth( width, width );
-                line.SetPosition( 0, origin );
-                line.SetPosition( 1, origin + pointing*( (distance>0)?distance:maxDistance ) );
+                line.SetPosition( 0, useOrigin );
+                line.SetPosition( 1, useOrigin + usePointing*( (distance>0)?distance:maxDistance ) );
             }
         }
     }

@@ -1,7 +1,7 @@
 # Bash script (that should work in gitbash on Windows) that 
 # will crate the export ZIP file for installing the mod.
 
-# Run with "bash makePackage" from this directory.
+# Run with "bash makePackage.sh" from this directory.
 
 
 # ------------------------------------------------------------
