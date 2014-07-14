@@ -56,6 +56,7 @@ namespace LaserDist
 
         private bool isDrawing = false;
         private bool isOnMap = false;
+        private bool isInEditor = false;
         
         private GameObject lineObj = null;
         private LineRenderer line = null;
@@ -67,30 +68,33 @@ namespace LaserDist
         private int maskBitScaledScenery = 10;
         private int maskBitLocalScenery = 15;
         private int maskBitKerbals = 16;
+        private int maskBitEditorUI = 17;
         private int maskBitDisconnectedParts = 19;
         private int maskBitPartTriggers= 21;
         private int maskBitWheelColliders = 27;
-        private int maskBitTerrainCollidres = 28;
+        private int maskBitTerrainColliders = 28;
 
         /// <summary>Distance the laser is showing to the first collision:</summary>
-        [KSPField(isPersistant=true, guiName = "Distance", guiActive = true, guiUnits = "m")]
+        [KSPField(isPersistant=true, guiName = "Distance", guiActive = true, guiActiveEditor = true, guiUnits = "m", guiFormat = "N2")]
         public float distance = 0.0f;
 
         /// <summary>Name of thing the laser is hitting:</summary>
-        [KSPField(isPersistant=true, guiName = "Hit", guiActive = true)]
+        [KSPField(isPersistant=true, guiName = "Hit", guiActive = true, guiActiveEditor = true)]
         public string hitName = "<none>";
 
         /// <summary>Distance the laser is showing to the first collision:</summary>
-        [KSPField(isPersistant=true, guiName = "Max Sensor Range", guiActive = true, guiUnits = "m")]
+        [KSPField(isPersistant=true, guiName = "Max Sensor Range", guiActive = true, guiActiveEditor = true, guiUnits = "m")]
         public float maxDistance = 10000f;        
 
         /// <summary>Flag controlling whether or not to see the laserbeam onscreen</summary>
-        [KSPField(isPersistant=true, guiName = "Laser Visibility", guiActive = true)]
-        private bool drawLaser = false;
+        [KSPField(isPersistant=true, guiName = "Visible", guiActive = true, guiActiveEditor = true),
+         UI_Toggle(disabledText="no", enabledText="yes")]
+        public bool drawLaser = false;
 
         /// <summary>Flag controlling whether or not the device is taking readings</summary>
-        [KSPField(isPersistant=true, guiName = "Active", guiActive = true)]
-        private bool activated = false;
+        [KSPField(isPersistant=true, guiName = "Enabled", guiActive = true, guiActiveEditor = true),
+         UI_Toggle(disabledText="no", enabledText="yes")]
+        public bool activated = false;
         
         /// <summary>
         /// Unity calls this hook during the KSP initial startup screen:
@@ -111,59 +115,23 @@ namespace LaserDist
                     + (1 << maskBitDisconnectedParts)
                     + (1 << maskBitPartTriggers)
                     + (1 << maskBitWheelColliders)
-                    + (1 << maskBitTerrainCollidres) ;
+                    + (1 << maskBitTerrainColliders) ;
         }
 
         // Actions to control the active flag:
         // ----------------------------------------
-        [KSPAction("activate")]
-        public void ActiveOn(KSPActionParam p)
-        {
-            activated = true;
-            ChangeIsDrawing();
-        }
-        [KSPAction("deactivate")]
-        public void ActiveOff(KSPActionParam p)
-        {
-            activated = false;
-            ChangeIsDrawing();
-        }
-        [KSPEvent(guiActive=true, guiName = "Toggle", active = true)]
-        public void ToggleActive()
-        {
-            activated = ! activated;
-            ChangeIsDrawing();
-        }
         [KSPAction("toggle")]
         public void ActionToggle(KSPActionParam p)
         {
-            ToggleActive();
+            activated = ! activated;
         }
 
         // Actions to control the visibility flag:
         // ----------------------------------------
-        [KSPAction("activate visibility")]
-        public void VisibilityOn(KSPActionParam p)
-        {
-            drawLaser = true;
-            ChangeIsDrawing();
-        }
-        [KSPAction("deactivate visibility")]
-        public void VisibilityOff(KSPActionParam p)
-        {
-            drawLaser = false;
-            ChangeIsDrawing();
-        }
-        [KSPEvent(guiActive=true, guiName = "Toggle Visibility", active = true)]
-        public void ToggleVisibility()
-        {
-            drawLaser = ! drawLaser;
-            ChangeIsDrawing();
-        }
         [KSPAction("toggle visibility")]
         public void ActionToggleVisibility(KSPActionParam p)
         {
-            ToggleVisibility();
+            drawLaser = ! drawLaser;
         }
         
         
@@ -227,8 +195,19 @@ namespace LaserDist
         /// </summary>
         public override void OnUpdate()
         {
+            ChangeIsDrawing();
             castUpdate();
             drawUpdate();
+        }
+        
+        public void Update()
+        {
+            // Normally a PartModule's OnUpdate isn't called when in the
+            // editor mode:  This enables it, so the beam will appear
+            // when in the VAB:
+            isInEditor = HighLogic.LoadedSceneIsEditor;
+            if( isInEditor )
+                OnUpdate();
         }
         
         /// <summary>
@@ -259,7 +238,6 @@ namespace LaserDist
                     GameObject hitObject = hit.transform.gameObject;
                     if( hitObject != null )
                     {
-                        UnityEngine.Debug.Log( "Raycast Hit: layer = " + hitObject.layer );
                         hitName = hitObject.name; // default if the checks below don't work.
 
                         // Despite the name and what the Unity documentation says,
@@ -291,13 +269,10 @@ namespace LaserDist
                 // through it), then try the more expensive pqs ray cast solver.
                 if( newDist < 0 || newDist > 100000 )
                 {
-                    // Try a hit a different way - using the PQS solver.  The pqs solver
-                    // operates in map view coords even when the game is in flight camera
-                    // mode.  (Both flight and map drawings always exist in Unity at the same
-                    // time, but some are masked off depending on view mode.)
+                    // Try a hit a different way - using the PQS solver: 
                     string pqsName;
                     double pqsDist;
-                    if( pqsTool.RayCast( mapOrigin, mapPointing, out pqsName, out pqsDist ) )
+                    if( pqsTool.RayCast( origin, pointing, out pqsName, out pqsDist ) )
                     {
                         // If it's a closer hit than we have already, then use it:
                         if( pqsDist < newDist || newDist < 0 )
@@ -319,12 +294,16 @@ namespace LaserDist
         private void drawUpdate()
         {
             isOnMap = MapView.MapIsEnabled;
+            isInEditor = HighLogic.LoadedSceneIsEditor;
             if( isDrawing )
             {
-                Vector3d useOrigin;
-                Vector3d usePointing;
-                /*
-                if( isOnMap )
+                Vector3d useOrigin = origin;
+                Vector3d usePointing = pointing;
+                if( isInEditor )
+                {
+                    lineObj.layer = maskBitDefault;
+                }
+                else if( isOnMap )
                 {
                     lineObj.layer = maskBitScaledScenery;
                     useOrigin = mapOrigin;
@@ -332,13 +311,8 @@ namespace LaserDist
                 }
                 else
                 {
-                */
                     lineObj.layer =  maskTransparentFX;
-                    useOrigin = origin;
-                    usePointing = pointing;
-                /*
                 }
-                */
 
                 float width = 0.02f;
 

@@ -25,7 +25,8 @@ namespace LaserDist
             List<CelestialBody> bodies = FlightGlobals.Bodies;
             double bestHitDist = -1.0;
             string bestHitName = "<none>";
-            double hitDist;
+            double hitDist = -1.0;
+            Vector3d hitVec;
             double now = Planetarium.GetUniversalTime();
             
             // For each body in the game, find if there's a hit with its surface calculator,
@@ -34,33 +35,31 @@ namespace LaserDist
             // nearer of those hits.)
             foreach( CelestialBody body in bodies )
             {
-                UnityEngine.Debug.Log( "eraseme: X Looking for hit with body " + body.GetName() );
                 PQS pqs = body.pqsController;
                 if( pqs != null )
                 {
-                    // PQS.RayIntersection() finds false hits on the backside of
-                    // the planet when you are faced away from the planet.  To filter the
-                    // false hits out, the only hits that count are ones with an acute angle
-                    // between the raycast and the ray to the center of the planet:
-                    double ang = Vector3d.Angle( rayVec, (body.position - origin) );
+                    // This next line is needed because of what I believe to be a bug in
+                    // KSP's PQS.RayIntersection method.  It appears to be rotating
+                    // the input direction vector once the wrong way for its calculations,
+                    // making it necessary to rotate it twice the correct way to compensate
+                    // for the fact that it insists on rotating it the wrong way.  If a new
+                    // release of KSP ever fixes this bug, then this next line will have to be
+                    // edited.  That's why this long comment is here.  Please don't remove it.
+                    Vector3d useRayVec = pqs.transformRotation * ( pqs.transformRotation * rayVec );
 
-                    if( ang < 90 )
+                    if( pqs.RayIntersection( origin, useRayVec, out hitVec ) )
                     {
-                        // This next line is needed because of what I believe to be a bug in
-                        // KSP's PQS.RayIntersection method.  It appears to be rotating
-                        // the input direction vector once the wrong way for its calculations,
-                        // making it necessary to rotate it twice the correct way to compensate
-                        // for the fact that it insists on rotating it the wrong way.  If a new
-                        // release of KSP ever fixes this bug, then this next line will have to be
-                        // edited.  That's why this long comment is here.  Please don't remove it.
-                        Vector3d useRayVec = pqs.transformRotation * ( pqs.transformRotation * rayVec );
+                        Vector3d hitVecRelToOrigin = hitVec-origin;
 
-                        if( pqs.RayIntersection( origin, useRayVec, out hitDist ) )
+                        // Check to see if the hit is "behind" the ray - because despite the name,
+                        // pqs.RayIntersection actually finds hits anyhwere along the line, even
+                        // behind the start of the ray.  If the hit is behind the ray, it doesn't
+                        // count:
+                        if( Vector3d.Angle( hitVecRelToOrigin, rayVec ) <= 90 )
                         {
-                            UnityEngine.Debug.Log( "eraseme:   Hit found, distance = " + hitDist );
+                            hitDist = hitVecRelToOrigin.magnitude;
                             if( bestHitDist < 0 || bestHitDist > hitDist )
                             {
-                                UnityEngine.Debug.Log( "eraseme:      Hit is better than prev." );
                                 bestHitDist = hitDist;
                                 bestHitName = body.GetName();
                             }
@@ -84,7 +83,6 @@ namespace LaserDist
             {
                 lastFailTime = now;
             }
-            UnityEngine.Debug.Log( "eraseme:  about to return hitfound = " + hitFound.ToString() );
             return hitFound;
         }
     }
