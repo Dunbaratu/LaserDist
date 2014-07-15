@@ -37,10 +37,13 @@ pointed when you mounted it on the craft, as demonstrated here:
 
 ![LaserDist screenshot 2](readme_screenshot2.png)
 
-### Why?
+The electric draw for the laser is substantial.  Each laser consumes
+1 electric charge every 3 seconds that it's on.
+
+### Why does this Mod exist?
 
 The intended purpose of this part is to be used in conjunction with
-the scripted autopilot [kOS](https://github.com/KSP-KOS/KOS/releases), to
+scripted autopilots like [kOS](https://github.com/KSP-KOS/KOS/releases), to
 provide a way to for you to write scripted pilot software that can
 see the distance to the ground (or anything else like a ship) along
 the laser line.  The reason this can be useful is so you can detect
@@ -64,6 +67,17 @@ any such mod.  I've been working in kOS mostly, but I didn't want this
 part to be kOS-specific because there's no particular reason it has
 to be.
 
+### Information for other modders trying to use the part:
+
+As long as the scripting autopilot is designed to be able to query
+and/or set KSPFields on parts, it should be able to read the value of
+the distance, and turn the laser on and off, as follows:
+
+* KSPField: 'distance' is a float - the number of meters being shown in the display.
+* KSPField: 'hitName' is a string - the name of the object being hit.
+* KSPField: 'drawLaser' is a bool - true if the beam should be drawn visibly on-screen.  (It can still show a distance number if this is false, but you can't see the red beam.)
+* KSPField: 'activated' is a bool - true if the measuring device is on. 
+
 ### How to Mount it.
 
 ![icon of Electronics node](http://wiki.kerbalspaceprogram.com/w/images/d/dd/Electronics.png). The Beamer 100x Dist-o-Meter is located in the "Electronics" tech node of the career tech tree. It's a 300-point node on the tree so you might not have it yet in a new fresh career game.
@@ -76,16 +90,39 @@ keys.)
 The Laser will bounce back and give you a distance measurement when
 it encounters *ANY* object, including parts of your own craft.  So
 take care to mount it somewhere where the laser beam will have a clear
-line of sight without obstruction.  Even exhaust plumes can block it,
-as they disrupt the beam enough to make the instrument fail to see 
-through the plume.
+line of sight without obstruction. 
 
-### Distance Limitation
+To ensure a good mounting point, you can use "tweakables" to enable the
+laser and make it show up in the VAB to look and see if you have it aimed
+well.
 
-The distance for measuring terrain polygons can't be higher than about 30000m
-or so on Kerbin, as that's the altitude at which Unity starts to unload
-the terrain hieght information.  The max distance changes depending on
-which planet you're on.
+### Lightspeed 
+
+Note that if you use it to measure the distance to a far away body (i.e.
+like aiming it at Duna from Kerbin), the mod does take into account
+lightspeed.  You have to hold the laser on an object steady and unchanged
+for the entire duration of time it takes for lightspeed delay to
+bounce the signal back or you won't get a measurement, so using it at that
+great distance will be very hard.
+
+### CURRENT KNOWN LIMITATIONS (i.e. the reason this is a WIP)
+
+These are limitations I plan to work on fixing:
+
+* **Distance only measures accurately when near the terrain!!**.  KSP
+unloads the polygon colliders when the terrain is far away from the
+craft, causing the laser to be unable to bounce off the terrain.  When
+you are more than about 6000-7000km away from terrain, it doesn't seem
+to work and instead returns the place where the ray hits the
+sea-level sphere under the terrain.  **There is a way to solve this, 
+but it involves performing a numerical approximation algorithm, which can
+be computationaly expensive, so it's a matter of finding the right
+balance between animation speed and accuracy.  That is why for this
+version, the fix isn't implemented yet.
+* The **Max distance isn't being enforced** yet.  The plan is to
+make a few different versions of this part that draw different amounts
+of power, and can go different ranges.  But for now despite what it
+says, the range is actually infinite.
 
 
 ### How do I use it from my script then?
@@ -93,14 +130,14 @@ which planet you're on.
 That hasn't been written yet.  I figured I'd make the part first, and
 then once it exists issues about how to integrate it can come later.
 
-Its a bit unclear to me how to make this mod's reading fit the same exact
-pattern as other sensor parts like the Gravioli detector and
-the thermometer.  That is the goal.  There seems to be some undocumented
-stuff going on with those parts, and my goal is to make this part behave
-the same way.
-
 But at the moment it still does work as a manual piloting instrument,
 which is good enough for a 0.1 release.
+
+The ability to iterate over parts and read their KSPFields (The stuff
+you see in the rightclick popup user interface panels) is a planned
+future feature of kOS, and that is how this is expected to work once
+it works.  By being designed that way it should also be usable by
+other mods too.
 
 ### Part modeling help?
 
