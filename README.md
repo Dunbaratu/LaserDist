@@ -112,7 +112,7 @@ These are limitations I plan to work on fixing:
 * **Distance only measures accurately when near the terrain!!**.  KSP
 unloads the polygon colliders when the terrain is far away from the
 craft, causing the laser to be unable to bounce off the terrain.  When
-you are more than about 6000-7000km away from terrain, it doesn't seem
+you are more than about 6000-7000m away from terrain, it doesn't seem
 to work and instead returns the place where the ray hits the
 sea-level sphere under the terrain.  **There is a way to solve this, 
 but it involves performing a numerical approximation algorithm, which can
