@@ -57,6 +57,9 @@ namespace LaserDist
         private bool isDrawing = false;
         private bool isOnMap = false;
         private bool isInEditor = false;
+        private bool hasPower = false;
+        private double prevTime = 0.0;
+        private double deltaTime = 0.0;
         
         private GameObject lineObj = null;
         private LineRenderer line = null;
@@ -95,6 +98,10 @@ namespace LaserDist
         [KSPField(isPersistant=true, guiName = "Enabled", guiActive = true, guiActiveEditor = true),
          UI_Toggle(disabledText="no", enabledText="yes")]
         public bool activated = false;
+
+        /// <summary>electric usage per second that it's on:</summary>:</summary>
+        [KSPField(isPersistant=true, guiName = "Electricity Drain", guiActive = true, guiActiveEditor = true, guiUnits = "/sec", guiFormat = "N2")]
+        public float electricPerSecond = 0.0f;
         
         /// <summary>
         /// Unity calls this hook during the KSP initial startup screen:
@@ -116,6 +123,12 @@ namespace LaserDist
                     + (1 << maskBitPartTriggers)
                     + (1 << maskBitWheelColliders)
                     + (1 << maskBitTerrainColliders) ;
+            
+        }
+
+        public override void OnActive()
+        {
+            GameEvents.onPartDestroyed.Add( OnLaserDestroy );
         }
 
         // Actions to control the active flag:
@@ -137,7 +150,7 @@ namespace LaserDist
         
         private void ChangeIsDrawing()
         {
-            bool newVal = (activated && drawLaser);
+            bool newVal = (hasPower && activated && drawLaser);
             if( newVal != isDrawing )
             {
                 if( newVal )
@@ -159,7 +172,7 @@ namespace LaserDist
         /// </summary>
         private void startDrawing()
         {
-            lineObj = new GameObject("laser line");
+            lineObj = new GameObject("LaserDist beam");
             isOnMap = MapView.MapIsEnabled;
             lineObj.layer = maskTransparentFX;
 
@@ -188,14 +201,29 @@ namespace LaserDist
                 lineObj = null;
             } 
         }
-        
+
+        /// <summary>
+        /// Make sure to stop the beam picture as the part is blown up:
+        /// </summary>
+        public void OnLaserDestroy(Part p)
+        {
+            isDrawing = false;
+            activated = false;
+            ChangeIsDrawing();                
+        }
+
         /// <summary>
         ///   Gets new distance reading if the device is on,
         ///   and handles the toggling of the display of the laser.
         /// </summary>
         public override void OnUpdate()
         {
+            double nowTime = Planetarium.GetUniversalTime();
+            deltaTime = nowTime - prevTime;            
+            prevTime = nowTime;
+
             ChangeIsDrawing();
+            drainPower();
             castUpdate();
             drawUpdate();
         }
@@ -209,7 +237,27 @@ namespace LaserDist
             if( isInEditor )
                 OnUpdate();
         }
-        
+
+        /// <summary>
+        /// Use electriccharge, and check if power is out, and if so, disable:
+        /// </summary>
+        private void drainPower()
+        {
+            if( activated )
+            {
+                float drainThisUpdate = (float) (electricPerSecond * deltaTime);
+                float actuallyUsed = part.RequestResource("ElectricCharge", drainThisUpdate);
+                if( actuallyUsed < drainThisUpdate/2.0 )
+                {
+                    hasPower = false;
+                }
+                else
+                {
+                    hasPower = true;
+                }
+            }
+        }
+
         /// <summary>
         ///   Recalculates the distance to a hit item, or -1f if nothing
         ///   was hit by the laser.
@@ -219,7 +267,7 @@ namespace LaserDist
         {
             float newDist = -1f;
             hitName = "<none>";
-            if( activated )
+            if( hasPower & activated )
             {
                 origin = this.part.transform.TransformPoint( relLaserOrigin );
                 pointing = this.part.transform.rotation * Vector3d.down;
@@ -305,6 +353,9 @@ namespace LaserDist
                 }
                 else if( isOnMap )
                 {
+                    // Drawing the laser on the map was
+                    // only enabled for the purpose of debugging.
+                    // It might go away later:
                     lineObj.layer = maskBitScaledScenery;
                     useOrigin = mapOrigin;
                     usePointing = mapPointing;
