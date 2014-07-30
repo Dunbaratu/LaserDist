@@ -8,6 +8,7 @@
  */
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace LaserDist
 {
@@ -17,14 +18,101 @@ namespace LaserDist
     /// </summary>
     public class LaserPQSUtil
     {
-        double lightspeed = 299792458; // in m/s
-        double lastFailTime = 0.0;
+        // These static settings tweak the numeric approximation algorithm:
+        // ------------------------------------------------------------------
+        
+        // Number of meters of error that's considered "good enough" to stop the algorithm:
+        // Because this is only used for terrain that's very far away, and also the PQS
+        // predicted terrain won't exactly match the actual terrain polygons that it gets
+        // modelled with when you get closer, making it more accurate is misleading anyway.
+        private static double epsilon = 3;
+        
+        // Number of maximum iterations allowed before aborting the algorithm and accepting
+        // the answer (even if it's not as accurate as epsilon yet).  (On a 2.4 ghz cpu this
+        // was tested on, you can get about 75 iterations per 1 millisecond).  This could probably
+        // go a few more iterations than it does, but I want to be polite to other mods that are
+        // trying to operate in the same Update and keep my execution footprint as quick as possible.
+        private static int iterationCap = 60;
+        
+        // Number of slices to divide the line segment into per recursion level:
+        private static int slices = 15;
 
-        public bool RayCast( Vector3d origin, Vector3d rayVec, out string name, out double dist )
+        private static double lightspeed = 299792458; // in m/s
+
+        private double lastFailTime = 0.0;
+        private Part laserPart;
+
+        
+        public LaserPQSUtil( Part p )
+        {
+            laserPart = p;
+        }
+
+        /// <summary>
+        /// Perform the raycast using the PQS solver's ideal terrain calculation rather
+        /// than the actual terrain polygons.  This can only give a numerical approximation
+        /// answer by recursive guessing, but it should be good enough.
+        /// </summary>
+        /// <param name="origin">Unity World coords of the ray start</param>
+        /// <param name="rayVec">Unity World coords direction vector relative to the origin</param>
+        /// <param name="hitBody">Returns the CelestialBody that was hit, i.e. Kerbin</param>
+        /// <param name="dist">Returns the disance in meters from the origin to the hit</param>
+        /// <returns>True if there was a hit, False if there wasn't</returns>
+        public bool RayCast( Vector3d origin, Vector3d rayVec, out CelestialBody hitBody, out double dist )
+        {
+            double seaLevelDist = -1.0;
+            hitBody = null;
+            dist = -1.0;
+
+            // Start off with the sea level hit, knowing the terrain hit has to be no farther
+            // than that:
+            bool didHit = raySeaLevelCast( origin, rayVec, out hitBody, out seaLevelDist );
+            
+            // If there wasn't a sea level hit, then there might still be a terrain hit anyway, up above
+            // the sea where the laser misses the sea level sphere but does hit the PQS terrain.  To deal
+            // with that case, if there is no sea level hit then set a fake endpoint distance no farther
+            // than the distance to the body's center.
+            if( ! didHit )
+            {
+                hitBody = laserPart.vessel.GetOrbit().referenceBody;
+                seaLevelDist = laserPart.vessel.altitude + hitBody.Radius;
+            }
+            
+            // Only bother doing the expensive check with the PQS terrain when in the sphere of
+            // influence of the hitBody - don't bother for hits on distance bodies - for them
+            // the sea level hit is good enough:
+            if( didHit && laserPart.vessel.GetOrbit().referenceBody != hitBody )
+            {
+                dist = seaLevelDist;
+            }
+            else
+            {
+                // Begin the recursion for the more computationally expensive PQS numeric solver:
+                // ------------------------------------------------------------------------------
+                Vector3d pointingUnitVec = rayVec.normalized;
+                double terrainDist = numericPQSSolver( hitBody, origin, pointingUnitVec, iterationCap, seaLevelDist );
+                if( terrainDist >= 0 )
+                {
+                    didHit = true;
+                    dist = terrainDist;
+                }
+            }
+            
+            return didHit;
+        }
+
+        /// <summary>
+        /// This routine was originally meant to actually do the raycast entirely by itself,
+        /// but the KSP API method pqs.RayIntersection() does not do what it sounds like it does.
+        /// It only finds the sea-level intersection, not the terrain intersection.  So now this
+        /// method is only the initial starting point of the algorithm - it just finds the sea level
+        /// intersect that's under the actual terrain.
+        /// </summary>
+        private bool raySeaLevelCast( Vector3d origin, Vector3d rayVec, out CelestialBody hitBody, out double dist )
         {
             List<CelestialBody> bodies = FlightGlobals.Bodies;
             double bestHitDist = -1.0;
-            string bestHitName = "<none>";
+            CelestialBody bestHitBody = null;
             double hitDist = -1.0;
             Vector3d hitVec;
             double now = Planetarium.GetUniversalTime();
@@ -61,13 +149,13 @@ namespace LaserDist
                             if( bestHitDist < 0 || bestHitDist > hitDist )
                             {
                                 bestHitDist = hitDist;
-                                bestHitName = body.GetName();
+                                bestHitBody = body;
                             }
                         }
                     }
                 }
             }
-            name = bestHitName;
+            hitBody = bestHitBody;
             dist = bestHitDist;
             bool hitFound = (dist > 0);
             if( hitFound )
@@ -84,6 +172,85 @@ namespace LaserDist
                 lastFailTime = now;
             }
             return hitFound;
+        }
+        
+        /// <summary>
+        /// This is the recursive function that implements the numeric terrain hit solver.
+        /// The exact algorithm is too wordy to explain here in a text comment.  See
+        /// the image in doc/ under Recursive_Numeric_Terrain_Hit.png .
+        /// </summary>
+        /// <param name="hitBody"> body of the terrain</param>
+        /// <param name="origin"> start of this line segment of the ray</param>
+        /// <param name="pointingUnitVec"> direction of the ray - must be a unit vector starting at origin</param>
+        /// <param name="itersLeft">Number of iterations allowed before exiting and accepting the answer so far</param>
+        /// <param name="dist"> length of this line segment of the ray</param>
+        /// <returns>The closer dist that was hit, or -1 if no hit found</returns>
+        private double numericPQSSolver(
+            CelestialBody hitBody, Vector3d origin, Vector3d pointingUnitVec, int itersLeft, double dist )
+        {
+            int i;
+            double lat;
+            double lng;
+            double newDist = dist;
+            int slicesThisTime = Math.Min( itersLeft, slices );
+            Vector3d samplePoint = origin;
+            Vector3d prevSamplePoint;
+            // We already know i=0 is above ground, so start at i=1:
+            for( i = 1 ; i < slicesThisTime ; ++i )
+            {
+                prevSamplePoint = samplePoint;
+                samplePoint = origin + (i*(dist/slices))*pointingUnitVec;
+                double segmentLength = (samplePoint - prevSamplePoint).magnitude;
+                
+                if( segmentLength <= epsilon )
+                    break;
+
+                lat = hitBody.GetLatitude( samplePoint );
+                lng = hitBody.GetLongitude( samplePoint );
+
+                var bodyUpVector = new Vector3d( 1, 0, 0 );
+                bodyUpVector = QuaternionD.AngleAxis( lat, Vector3d.forward/*around Z axis*/ ) * bodyUpVector;
+                bodyUpVector = QuaternionD.AngleAxis( lng, Vector3d.down/*around -Y axis*/ ) * bodyUpVector;
+
+                double groundAlt = hitBody.pqsController.GetSurfaceHeight( bodyUpVector ) - hitBody.Radius;
+                double samplePointAlt = hitBody.GetAltitude( samplePoint );
+                
+                if( samplePointAlt <= groundAlt )
+                {
+                    newDist = numericPQSSolver( hitBody, prevSamplePoint, pointingUnitVec, itersLeft - i, segmentLength );
+                    break;
+                }
+            }
+            
+            return newDist;
+        }
+        
+        /// <summary>
+        /// A debugging tool that was used to see how fast the PQS altitude detector actually is.
+        /// It spams a LOT of random lat/long queries at the PQS solver.  You call it once per update
+        /// to see how badly it lags the game.
+        /// </summary>
+        /// <param name="numQueries">The number of PQS queries to try to spam at the API.</param>
+        public void StressTestPQS(CelestialBody body, int numQueries)
+        {
+            System.Random randGen = new System.Random(); // "System." prefix because Unity also called a class 'Random'.
+            double lat;
+            double lng;
+            double alt;
+            
+            for( int i = 0 ; i < numQueries ; ++i )
+            {
+                lat = randGen.NextDouble();
+                lng = randGen.NextDouble();
+                
+                // Convert the lat/lng into the coords pqs solver expects (this is similar work
+                // as will be done by the actual algorithm, so it's important to the stress test):
+                var bodyUpVector = new Vector3d(1,0,0);
+                bodyUpVector = QuaternionD.AngleAxis(lat, Vector3d.forward/*around Z axis*/) * bodyUpVector;
+                bodyUpVector = QuaternionD.AngleAxis(lng, Vector3d.down/*around -Y axis*/) * bodyUpVector;
+                
+                alt = body.pqsController.GetSurfaceHeight( bodyUpVector ) - body.Radius ;                
+            }
         }
     }
 }

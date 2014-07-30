@@ -54,6 +54,8 @@ namespace LaserDist
         /// </summary>
         private LaserPQSUtil pqsTool;
 
+        private bool doStressTest = false; // There's a debug test I left in the code that this enables.
+
         private bool isDrawing = false;
         private bool isOnMap = false;
         private bool isInEditor = false;
@@ -111,7 +113,7 @@ namespace LaserDist
         {
             moduleName = "LaserDistModule";
             relLaserOrigin = new Vector3d(0.0,-0.3,0.0);
-            pqsTool = new LaserPQSUtil();
+            pqsTool = new LaserPQSUtil(part);
             
             mask =  (1 << maskBitDefault)
                     + (1 << maskBitWater)
@@ -226,8 +228,23 @@ namespace LaserDist
             drainPower();
             castUpdate();
             drawUpdate();
+            
+            if( doStressTest )
+            {
+                // This code was how I judged how many iterations I should allow the PQS
+                // algorithm to take per update - it measures how sluggish animation
+                // gets if I use the PQS altitude solver a lot per update.  It should never
+                // be enabled again unless you're trying to repeat that sort of test.  It
+                // bogs down KSP.
+                int numQueries = 1000;
+                System.Diagnostics.Stopwatch timer = new System.Diagnostics.Stopwatch();
+                timer.Start();
+                pqsTool.StressTestPQS(part.vessel.GetOrbit().referenceBody, numQueries);
+                timer.Stop();
+                UnityEngine.Debug.Log( "StressTestPQS: for " + numQueries + ", " + timer.Elapsed.TotalMilliseconds + "millis" );
+            }
         }
-        
+
         public void Update()
         {
             // Normally a PartModule's OnUpdate isn't called when in the
@@ -318,14 +335,14 @@ namespace LaserDist
                 if( newDist < 0 || newDist > 100000 )
                 {
                     // Try a hit a different way - using the PQS solver: 
-                    string pqsName;
                     double pqsDist;
-                    if( pqsTool.RayCast( origin, pointing, out pqsName, out pqsDist ) )
+                    CelestialBody pqsBody;
+                    if( pqsTool.RayCast( origin, pointing, out pqsBody, out pqsDist ) )
                     {
                         // If it's a closer hit than we have already, then use it:
                         if( pqsDist < newDist || newDist < 0 )
                         {
-                            hitName = pqsName;
+                            hitName = pqsBody.name;
                             newDist = (float) pqsDist;
                         }
                     }
