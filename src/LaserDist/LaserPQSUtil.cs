@@ -32,10 +32,11 @@ namespace LaserDist
         // was tested on, you can get about 75 iterations per 1 millisecond).  This could probably
         // go a few more iterations than it does, but I want to be polite to other mods that are
         // trying to operate in the same Update and keep my execution footprint as quick as possible.
-        private static int iterationCap = 60;
+        private static int iterationCap = 100;
         
-        // Number of slices to divide the line segment into per recursion level:
-        private static int slices = 15;
+        // Number of slices to typically divide the line segment into per recursion level,
+        // although some circumstances can change this:
+        private static int defaultSlices = 30;
 
         private static double lightspeed = 299792458; // in m/s
 
@@ -67,7 +68,10 @@ namespace LaserDist
             // Start off with the sea level hit, knowing the terrain hit has to be no farther
             // than that:
             bool didHit = raySeaLevelCast( origin, rayVec, out hitBody, out seaLevelDist );
-            
+            if( didHit )
+            {
+                dist = seaLevelDist;
+            }
             // If there wasn't a sea level hit, then there might still be a terrain hit anyway, up above
             // the sea where the laser misses the sea level sphere but does hit the PQS terrain.  To deal
             // with that case, if there is no sea level hit then set a fake endpoint distance no farther
@@ -81,17 +85,15 @@ namespace LaserDist
             // Only bother doing the expensive check with the PQS terrain when in the sphere of
             // influence of the hitBody - don't bother for hits on distance bodies - for them
             // the sea level hit is good enough:
-            if( didHit && laserPart.vessel.GetOrbit().referenceBody != hitBody )
-            {
-                dist = seaLevelDist;
-            }
-            else
+            if( (! didHit) || laserPart.vessel.GetOrbit().referenceBody == hitBody )
             {
                 // Begin the recursion for the more computationally expensive PQS numeric solver:
                 // ------------------------------------------------------------------------------
                 Vector3d pointingUnitVec = rayVec.normalized;
-                double terrainDist = numericPQSSolver( hitBody, origin, pointingUnitVec, iterationCap, seaLevelDist );
-                if( terrainDist >= 0 )
+                double terrainDist;
+                bool success = numericPQSSolver(
+                    out terrainDist, hitBody, origin, pointingUnitVec, iterationCap, seaLevelDist, defaultSlices );
+                if( success )
                 {
                     didHit = true;
                     dist = terrainDist;
@@ -176,30 +178,40 @@ namespace LaserDist
         
         /// <summary>
         /// This is the recursive function that implements the numeric terrain hit solver.
-        /// The exact algorithm is too wordy to explain here in a text comment.  See
-        /// the image in doc/ under Recursive_Numeric_Terrain_Hit.png .
+        /// The exact algorithm is too wordy to explain here in a text comment.
+        /// See this markdown file on github for the full explanation:
+        ///     doc/Recursive_Numeric_Terrain_Hit.md
         /// </summary>
-        /// <param name="hitBody"> body of the terrain</param>
-        /// <param name="origin"> start of this line segment of the ray</param>
-        /// <param name="pointingUnitVec"> direction of the ray - must be a unit vector starting at origin</param>
+        /// <param name="hitBody">body of the terrain</param>
+        /// <param name="origin">start of this line segment of the ray</param>
+        /// <param name="pointingUnitVec">direction of the ray - must be a unit vector starting at origin</param>
         /// <param name="itersLeft">Number of iterations allowed before exiting and accepting the answer so far</param>
-        /// <param name="dist"> length of this line segment of the ray</param>
+        /// <param name="dist">length of this line segment of the ray</param>
+        /// <param name="slices">Number of slices to try to cut the line segment into</param>
         /// <returns>The closer dist that was hit, or -1 if no hit found</returns>
-        private double numericPQSSolver(
-            CelestialBody hitBody, Vector3d origin, Vector3d pointingUnitVec, int itersLeft, double dist )
+        private bool numericPQSSolver(
+            out double newDist,
+            CelestialBody hitBody,
+            Vector3d origin,
+            Vector3d pointingUnitVec,
+            int itersLeft,
+            double dist,
+            int slices )
         {
+            Debug.Log( "numericPQSSolver( "+hitBody.name+", "+origin+", "+pointingUnitVec+", "+itersLeft+", "+dist+", "+slices+");");
+            bool success = false;
             int i;
             double lat;
             double lng;
-            double newDist = dist;
+            newDist = dist;
             int slicesThisTime = Math.Min( itersLeft, slices );
             Vector3d samplePoint = origin;
             Vector3d prevSamplePoint;
             // We already know i=0 is above ground, so start at i=1:
-            for( i = 1 ; i < slicesThisTime ; ++i )
+            for( i = 1 ; i <= slicesThisTime ; ++i )
             {
                 prevSamplePoint = samplePoint;
-                samplePoint = origin + (i*(dist/slices))*pointingUnitVec;
+                samplePoint = origin + (i*(dist/slicesThisTime))*pointingUnitVec;
                 double segmentLength = (samplePoint - prevSamplePoint).magnitude;
                 
                 if( segmentLength <= epsilon )
@@ -217,23 +229,55 @@ namespace LaserDist
                 
                 if( samplePointAlt <= groundAlt )
                 {
-                    newDist = numericPQSSolver( hitBody, prevSamplePoint, pointingUnitVec, itersLeft - i, segmentLength );
+                    success = true;
+                    double subSectionDist;
+                    numericPQSSolver( out subSectionDist, hitBody, prevSamplePoint, pointingUnitVec,
+                                      itersLeft - i, segmentLength, slices );
+                    newDist = ((i-1)*(dist/slicesThisTime)) + subSectionDist;
                     break;
                 }
             }
+            Debug.Log( "numericPQSSolver reached i = "+ i );
             
-            return newDist;
+            if( i > slicesThisTime )
+            {
+                // The above loop got to the end without finding a hit.
+                // Before giving up, it might be the case that there's a hit under the ground
+                // in-between the sample points that were tried, like this:
+                // 
+                //                            __
+                //                           /  \
+                // *----------*----------*--/----\--*----------*----------*----------*----
+                //                  _   ___/  ^   \     ____
+                //  _____      ____/ \_/      |    \___/    \        _________
+                //       \____/            hit in            \______/         \__________
+                //                      between the
+                //                     sample points
+                //
+                // Therefore if there's enough itersLeft remaining to try again with a tighter
+                // sampling, then do so:
+                if( itersLeft-i >= slices )
+                {
+                    success = numericPQSSolver( out newDist, hitBody, origin, pointingUnitVec,
+                                                itersLeft - slicesThisTime, dist, 2*slices );
+                }
+            }
+            Debug.Log( "numericPQSSolver returning "+ success+ " dist="+newDist );
+            return success;
         }
         
         /// <summary>
         /// A debugging tool that was used to see how fast the PQS altitude detector actually is.
         /// It spams a LOT of random lat/long queries at the PQS solver.  You call it once per update
-        /// to see how badly it lags the game.
+        /// to see how badly it lags the game.  This was used to experimentally find the best
+        /// value for defaultSlices given that the goal is to be polite to other mods trying to use
+        /// the same limited Update timeslice.  The goal was to make the algorithm only take about 2-3
+        /// milliseconds.  This method is only used when debugging.
         /// </summary>
         /// <param name="numQueries">The number of PQS queries to try to spam at the API.</param>
         public void StressTestPQS(CelestialBody body, int numQueries)
         {
-            System.Random randGen = new System.Random(); // "System." prefix because Unity also called a class 'Random'.
+            System.Random randGen = new System.Random(); // "System." prefix because there's a UnityEngine.Random.
             double lat;
             double lng;
             double alt;
