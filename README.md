@@ -37,8 +37,24 @@ pointed when you mounted it on the craft, as demonstrated here:
 
 ![LaserDist screenshot 2](readme_screenshot2.png)
 
+The laser can work over long distances - here it's measuring the
+distance from a Kerbin orbit vessel to the Mun:
+
+![LaserDist screenshot 3](readme_screenshot3.png)
+
+And even at those very long distances, the lasers can measure
+rather small differences in distace, within reason (it has
+an accuracy of 2 meters at this extreme range, to keep the
+game from bogging down too much).  In the screenshot below,
+notice how the two lasers are returning different numbers for
+their distance to the terrain very far away:
+
+![LaserDist screenshot 4](readme_screenshot4.png)
+
+
 The electric draw for the laser is substantial.  Each laser consumes
 1 electric charge every 3 seconds that it's on.
+
 
 ### Why does this Mod exist?
 
@@ -67,16 +83,18 @@ any such mod.  I've been working in kOS mostly, but I didn't want this
 part to be kOS-specific because there's no particular reason it has
 to be.
 
-### Information for other modders trying to use the part:
+### Information about the data fields the part displays:
 
-As long as the scripting autopilot is designed to be able to query
-and/or set KSPFields on parts, it should be able to read the value of
-the distance, and turn the laser on and off, as follows:
+![LaserDist Rightclick panel 1](rightpanel.png)
 
-* KSPField: 'distance' is a float - the number of meters being shown in the display.
-* KSPField: 'hitName' is a string - the name of the object being hit.
-* KSPField: 'drawLaser' is a bool - true if the beam should be drawn visibly on-screen.  (It can still show a distance number if this is false, but you can't see the red beam.)
-* KSPField: 'activated' is a bool - true if the measuring device is on. 
+* KSPField: 'Distance' is a float - the number of meters being shown in the display.  It's -1 if there is currently no hit.
+* KSPField: 'HitName' is a string - the name of the object being hit.
+* KSPField: 'Activated' is a bool - true if the measuring device is on. 
+* KSPField: 'DrawLaser' is a bool (called "Visible" in the GUI) - true if the laser should be drawn when it's activated or false if it should be (realistically) invisible because, hey, it's coherent light and it's not supposed to be seen from the side.
+* KSPField: 'CPUGreedyPercent' is a float (called "CPU hog" in the GUI) ranging from 0.0 to 20.0.  It's how much of a single physics tick of time this mod will allow itself to consume during a single Update.  If it hasn't gotten a good enough answer within that much time, it will wait until the next update to continue the calculation.
+* KSPField: 'UpdateAge' is an integer - It's how many Unity Updates (animation frames, basically) it's been since the value you are seeing was calculated.  Becuase of the logic of CPUGreedyPercent (see above) sometimes the value being displayed is stale by a few update ticks and shouldn't be trusted until the next time that UpdateAge becomes zero again.  If you're in a situation where this mod needs to spend more than 1 update of time to get to a good answer for the distance, you'll see this value spinning a bit, quickly going 0,1,2,3,0,1,2,3,0,1,2,3...etc.  When you see that, only when it hit the zeros was the distance value perfectly correct at THAT moment.
+
+Note: The higher that CPUGreedyPercent ("CPU hog") is, the less likely it is that UpdateAge will ever be nonzero, but the bigger hit your framerate might take.
 
 ### How to Mount it.
 
@@ -105,39 +123,41 @@ for the entire duration of time it takes for lightspeed delay to
 bounce the signal back or you won't get a measurement, so using it at that
 great distance will be very hard.
 
-### CURRENT KNOWN LIMITATIONS (i.e. the reason this is a WIP)
+### FUTURE EXPANSION PLANS (i.e. the reason this is a WIP)
 
-These are limitations I plan to work on fixing:
+**Max distance isn't enforced yet**:  It's part of a future plan
+to have different variants of the part that work better the
+higher up the tech tree you go.  For now, despite what it says,
+the range is actually infinite.
 
-* **Distance only measures accurately when near the terrain!!**.  KSP
-unloads the polygon colliders when the terrain is far away from the
-craft, causing the laser to be unable to bounce off the terrain.  When
-you are more than about 6000-7000m away from terrain, it doesn't seem
-to work and instead returns the place where the ray hits the
-sea-level sphere under the terrain.  **There is a way to solve this, 
-but it involves performing a numerical approximation algorithm, which can
-be computationaly expensive, so it's a matter of finding the right
-balance between animation speed and accuracy.  That is why for this
-version, the fix isn't implemented yet.
-* The **Max distance isn't being enforced** yet.  The plan is to
-make a few different versions of this part that draw different amounts
-of power, and can go different ranges.  But for now despite what it
-says, the range is actually infinite.
-
+**Other sorts of sensors?**:  Now that the numerical approximation behind
+making a "fake raycast" that finds intersections with the planet terrain
+from far away and from any angle is implemented, this opens up the
+chance that other sorts of long range beam sensors could be made.
+For example a "biome detector" that returns the name of the biome
+where the hit occurred is a possibility, as is a "density at a distance"
+measurement which might tell you the atmospheric pressure or density
+at the ground level where the hit occurred.  (Maybe because of something
+that the laser detects about interference with the air?  It's a bit
+hard to justify realistically how that would work, but it's definitely
+possible with the software.  Just not sure if it's possible in the 
+real world, or whether real-world sanity is really the intent
+of this mod or not.
 
 ### How do I use it from my script then?
 
-That hasn't been written yet.  I figured I'd make the part first, and
-then once it exists issues about how to integrate it can come later.
+Very Soon Now(tm) the dev team of kOS (of which I'm part) plans to
+have a release that lets you read the fields of any part's KSPFields
+(The stuff you see in the rightclick popup user interface panels), and
+manipulate any part's widgets on the rightclick menus (the buttons,
+the sliders, etc).
 
-But at the moment it still does work as a manual piloting instrument,
-which is good enough for a 0.1 release.
+The plan from the beginning was to make LaserDist be a good test case
+of this feature that may actually be useful in its own right.
 
-The ability to iterate over parts and read their KSPFields (The stuff
-you see in the rightclick popup user interface panels) is a planned
-future feature of kOS, and that is how this is expected to work once
-it works.  By being designed that way it should also be usable by
-other mods too.
+But that's not released just yet.  So at the moment this is only
+usable as a manual piloting aid where you leave the part menu open
+and look at it by eye as you fly.
 
 ### Part modeling help?
 

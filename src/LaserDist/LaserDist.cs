@@ -27,6 +27,8 @@ namespace LaserDist
     /// </summary>
     public class LaserDistModule : PartModule
     {
+        private bool debugMsg = false;
+        
         /// <summary>
         ///   Laser's origin relative to the part's coord transform:
         /// </summary>
@@ -62,7 +64,7 @@ namespace LaserDist
         private bool hasPower = false;
         private double prevTime = 0.0;
         private double deltaTime = 0.0;
-        
+                
         private GameObject lineObj = null;
         private LineRenderer line = null;
         private Int32 mask;
@@ -81,29 +83,43 @@ namespace LaserDist
 
         /// <summary>Distance the laser is showing to the first collision:</summary>
         [KSPField(isPersistant=true, guiName = "Distance", guiActive = true, guiActiveEditor = true, guiUnits = "m", guiFormat = "N2")]
-        public float distance = 0.0f;
+        public float Distance = 0.0f;
 
         /// <summary>Name of thing the laser is hitting:</summary>
         [KSPField(isPersistant=true, guiName = "Hit", guiActive = true, guiActiveEditor = true)]
-        public string hitName = "<none>";
+        public string HitName = "<none>";
 
         /// <summary>Distance the laser is showing to the first collision:</summary>
         [KSPField(isPersistant=true, guiName = "Max Sensor Range", guiActive = true, guiActiveEditor = true, guiUnits = "m")]
-        public float maxDistance = 10000f;        
+        public float MaxDistance = 10000f;        
 
         /// <summary>Flag controlling whether or not to see the laserbeam onscreen</summary>
         [KSPField(isPersistant=true, guiName = "Visible", guiActive = true, guiActiveEditor = true),
          UI_Toggle(disabledText="no", enabledText="yes")]
-        public bool drawLaser = false;
+        public bool DrawLaser = false;
 
         /// <summary>Flag controlling whether or not the device is taking readings</summary>
         [KSPField(isPersistant=true, guiName = "Enabled", guiActive = true, guiActiveEditor = true),
          UI_Toggle(disabledText="no", enabledText="yes")]
-        public bool activated = false;
+        public bool Activated = false;
 
-        /// <summary>electric usage per second that it's on:</summary>:</summary>
+        /// <summary>electric usage per second that it's on:</summary>
         [KSPField(isPersistant=true, guiName = "Electricity Drain", guiActive = true, guiActiveEditor = true, guiUnits = "/sec", guiFormat = "N2")]
-        public float electricPerSecond = 0.0f;
+        public float ElectricPerSecond = 0.0f;
+
+        /// <summary>
+        /// How greedy is this mod at using the CPU to come up with an answer every tick?  If the value is too large,
+        /// then the mod will bog down KSP's animation rate.  If the value is too small, then the mod will take a longer
+        /// time to retun an answer and it might take more than one Unity Update to get the answer.
+        /// </summary>
+        [KSPField(isPersistant=true, guiName = "CPU hog", guiActive = true, guiActiveEditor = true, guiUnits = "%"),
+         UI_FloatRange(minValue=1f, maxValue=20f, stepIncrement=1f)]
+        public float CPUGreedyPercent;
+        
+        /// <summary>How long ago was the value you see calculated, in integer number of updates?</summary>
+        /// TODO: If support for it ends up in kOS, then explicitly make this KSPField open to kOS without being seen on the menu.
+        [KSPField(isPersistant=true, guiName = "Update Age", guiActive = true, guiActiveEditor = true, guiUnits = " update(s)")]
+        public int UpdateAge = 0;
         
         /// <summary>
         /// Unity calls this hook during the KSP initial startup screen:
@@ -114,6 +130,7 @@ namespace LaserDist
             moduleName = "LaserDistModule";
             relLaserOrigin = new Vector3d(0.0,-0.3,0.0);
             pqsTool = new LaserPQSUtil(part);
+            pqsTool.tickPortionAllowed = (double) (CPUGreedyPercent / 100.0);
             
             mask =  (1 << maskBitDefault)
                     + (1 << maskBitWater)
@@ -138,7 +155,7 @@ namespace LaserDist
         [KSPAction("toggle")]
         public void ActionToggle(KSPActionParam p)
         {
-            activated = ! activated;
+            Activated = ! Activated;
         }
 
         // Actions to control the visibility flag:
@@ -146,13 +163,13 @@ namespace LaserDist
         [KSPAction("toggle visibility")]
         public void ActionToggleVisibility(KSPActionParam p)
         {
-            drawLaser = ! drawLaser;
+            DrawLaser = ! DrawLaser;
         }
         
         
         private void ChangeIsDrawing()
         {
-            bool newVal = (hasPower && activated && drawLaser);
+            bool newVal = (hasPower && Activated && DrawLaser);
             if( newVal != isDrawing )
             {
                 if( newVal )
@@ -209,8 +226,15 @@ namespace LaserDist
         /// </summary>
         public void OnLaserDestroy(Part p)
         {
-            isDrawing = false;
-            activated = false;
+            // To resolve github issue #5:
+            // It turns out KSP will call this on ALL part destructions anywhere
+            // in the game, not just when the part being destroyed is this one,
+            // so don't do anything if it's the wrong part.
+            //
+            if (p != this.part) return;
+            
+            Activated = false;
+            DrawLaser = false;
             ChangeIsDrawing();                
         }
 
@@ -221,7 +245,10 @@ namespace LaserDist
         public override void OnUpdate()
         {
             double nowTime = Planetarium.GetUniversalTime();
-            deltaTime = nowTime - prevTime;            
+            
+            pqsTool.tickPortionAllowed = (double) (CPUGreedyPercent / 100.0); // just in case user changed it in the slider.
+
+            deltaTime = nowTime - prevTime;
             prevTime = nowTime;
 
             ChangeIsDrawing();
@@ -241,7 +268,7 @@ namespace LaserDist
                 timer.Start();
                 pqsTool.StressTestPQS(part.vessel.GetOrbit().referenceBody, numQueries);
                 timer.Stop();
-                UnityEngine.Debug.Log( "StressTestPQS: for " + numQueries + ", " + timer.Elapsed.TotalMilliseconds + "millis" );
+                if( debugMsg ) UnityEngine.Debug.Log( "StressTestPQS: for " + numQueries + ", " + timer.Elapsed.TotalMilliseconds + "millis" );
             }
         }
 
@@ -260,9 +287,9 @@ namespace LaserDist
         /// </summary>
         private void drainPower()
         {
-            if( activated )
+            if( Activated )
             {
-                float drainThisUpdate = (float) (electricPerSecond * deltaTime);
+                float drainThisUpdate = (float) (ElectricPerSecond * deltaTime);
                 float actuallyUsed = part.RequestResource("ElectricCharge", drainThisUpdate);
                 if( actuallyUsed < drainThisUpdate/2.0 )
                 {
@@ -283,8 +310,8 @@ namespace LaserDist
         private void castUpdate()
         {
             float newDist = -1f;
-            hitName = "<none>";
-            if( hasPower & activated )
+            HitName = "<none>";
+            if( hasPower & Activated )
             {
                 origin = this.part.transform.TransformPoint( relLaserOrigin );
                 pointing = this.part.transform.rotation * Vector3d.down;
@@ -294,7 +321,7 @@ namespace LaserDist
                 mapPointing = pointing;
 
                 RaycastHit hit;
-                if( Physics.Raycast(origin, pointing, out hit, maxDistance, mask) )
+                if( Physics.Raycast(origin, pointing, out hit, MaxDistance, mask) )
                 {
                     newDist = hit.distance;
                     
@@ -303,7 +330,7 @@ namespace LaserDist
                     GameObject hitObject = hit.transform.gameObject;
                     if( hitObject != null )
                     {
-                        hitName = hitObject.name; // default if the checks below don't work.
+                        HitName = hitObject.name; // default if the checks below don't work.
 
                         // Despite the name and what the Unity documentation says,
                         // GetComponentInParent actually looks all the way up the
@@ -315,7 +342,7 @@ namespace LaserDist
                             CelestialBody body = hitObject.GetComponentInParent<CelestialBody>();
                             if( body != null )
                             {
-                                hitName = body.name;
+                                HitName = body.name;
                             }
                         }
                         else
@@ -323,9 +350,10 @@ namespace LaserDist
                             Part part = hitObject.GetComponentInParent<Part>();
                             if( part != null )
                             {
-                                hitName = part.name;
+                                HitName = part.name;
                             }
                         }
+                        UpdateAge = 0;
                     }
                 }
                 // If the hit is not found, or it is found but is far enough
@@ -334,21 +362,37 @@ namespace LaserDist
                 // through it), then try the more expensive pqs ray cast solver.
                 if( newDist < 0 || newDist > 100000 )
                 {
-                    // Try a hit a different way - using the PQS solver: 
                     double pqsDist;
                     CelestialBody pqsBody;
-                    if( pqsTool.RayCast( origin, pointing, out pqsBody, out pqsDist ) )
+                    bool success = pqsTool.RayCast( origin, pointing, out pqsBody, out pqsDist );
+                    if( pqsTool.UpdateAge == 0 )
                     {
-                        // If it's a closer hit than we have already, then use it:
-                        if( pqsDist < newDist || newDist < 0 )
+                        if( success )
                         {
-                            hitName = pqsBody.name;
-                            newDist = (float) pqsDist;
+                            // If it's a closer hit than we have already, then use it:
+                            if( pqsDist < newDist || newDist < 0 )
+                            {
+                                HitName = pqsBody.name;
+                                newDist = (float) pqsDist;
+                            }
                         }
                     }
+                    else
+                    {
+                        if( pqsTool.PrevSuccess )
+                        {
+                            // If it's a closer hit than we have already, then use it:
+                            if( pqsTool.PrevDist < newDist || newDist < 0 )
+                            {
+                                HitName = pqsTool.PrevBodyName;
+                                newDist = (float) pqsTool.PrevDist;
+                            }
+                        }
+                    }
+                    UpdateAge = pqsTool.UpdateAge;
                 }
             }
-            distance = newDist;
+            Distance = newDist;
             
         }
 
@@ -387,7 +431,7 @@ namespace LaserDist
                 line.SetVertexCount(2);
                 line.SetWidth( width, width );
                 line.SetPosition( 0, useOrigin );
-                line.SetPosition( 1, useOrigin + usePointing*( (distance>0)?distance:maxDistance ) );
+                line.SetPosition( 1, useOrigin + usePointing*( (Distance>0)?Distance:MaxDistance ) );
             }
         }
     }

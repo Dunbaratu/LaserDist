@@ -18,35 +18,113 @@ namespace LaserDist
     /// </summary>
     public class LaserPQSUtil
     {
+        private bool debugMsg = false;
+
+        // These values remember what the last state of the solver was from the
+        // previous Update that called it.  To be nice to other mods and the KSP
+        // system itself, sometimes LaserDist will deliberately choose not to
+        // finish its entire calculation in a single Update tick, deferring some
+        // of the work until the next update.  These are the variables that track
+        // the information from the previous update so it can pick up where it left
+        // off last time.  It may take several updates to get a final value within
+        // the desired epsilon.
+        // ------------------------------------------------------------------------
+        
+        /// <summary>
+        /// How many Unity Updates has it been since the last time the value coming out
+        /// of this class's raycaster was up to date and correct?  If it's zero, then the value
+        /// is up to date and correct for this Update.  If it's, for example, 3, then
+        /// that would mean that 3 updates ago it was correct, but it's been spending
+        /// the last 2 updates since then still working on a new answer and the answer
+        /// it's got at the moment shouldn't be trusted yet.
+        /// </summary>
+        public int UpdateAge {get; private set;}
+        
+        /// <summary>
+        /// Returns whatever the previous fully "done" answer from the pqs RayCast was.
+        /// use this when RayCast claims it's not done calculating yet.
+        /// </summary>
+        public double PrevDist {get; private set;}
+        /// <summary>
+        /// Returns whatever the previous fully "done" answer's success code from the pqs RayCast was.
+        /// use this when RayCast claims it's not done calculating yet.
+        /// </summary>
+        public bool PrevSuccess {get; private set;}
+        /// <summary>
+        /// Returns whatever the previous fully "done" answer's hit body from the pqs RayCast was.
+        /// use this when RayCast claims it's not done calculating yet.
+        /// </summary>
+        public string PrevBodyName {get; private set;}
+
+        // These are parameters to methd numericPQSSolver() where it should continue from the next time:
+        // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+        /// <summary>body of the terrain</summary>
+        private CelestialBody hitBody;
+        /// <summary>start of this line segment of the ray</summary>
+        private Vector3d origin;
+        /// <summary>direction of the ray - must be a unit vector starting at origin</summary>
+        private Vector3d pointingUnitVec;
+        /// <summary>length of this line segment of the ray</summary>
+        private double dist;
+        /// <summary>Number of slices to try to cut the line segment into</summary>
+        private int slices;
+        
+        /// <summary>For measuring how long the current raycast solve chunk has been going.</summary>
+        private System.Diagnostics.Stopwatch rayCastTimer;
+        
         // These static settings tweak the numeric approximation algorithm:
         // ------------------------------------------------------------------
         
-        // Number of meters of error that's considered "good enough" to stop the algorithm:
-        // Because this is only used for terrain that's very far away, and also the PQS
-        // predicted terrain won't exactly match the actual terrain polygons that it gets
-        // modelled with when you get closer, making it more accurate is misleading anyway.
-        private static double epsilon = 3;
+        /// <summary>
+        /// Number of meters of error that's considered "good enough" to stop the algorithm:
+        /// Because this is only used for terrain that's very far away, and also the PQS
+        /// predicted terrain won't exactly match the actual terrain polygons that it gets
+        /// modelled with when you get closer, making it more accurate is misleading anyway.
+        /// </summary>
+        private static double epsilon = 2;
         
-        // Number of maximum iterations allowed before aborting the algorithm and accepting
-        // the answer (even if it's not as accurate as epsilon yet).  (On a 2.4 ghz cpu this
-        // was tested on, you can get about 75 iterations per 1 millisecond).  This could probably
-        // go a few more iterations than it does, but I want to be polite to other mods that are
-        // trying to operate in the same Update and keep my execution footprint as quick as possible.
-        private static int iterationCap = 100;
+        /// <summary>
+        /// How many milliseconds will I allow myself to use during a single Unity Update call?
+        /// When this value gets exceeded, I will flag my result so far as being not good enough
+        /// (by incrementing UpdateAge so it's not zero), and also remember my current state
+        /// so I can continue from it on the next update.  If I do get down to an answer within
+        /// epsilon before this time runs out, then I will set UpdateAge to zero to indicate that
+        /// the current answer is a good one, and then return.
+        /// </summary>
+        private double millisecondCap;
         
-        // Number of slices to typically divide the line segment into per recursion level,
-        // although some circumstances can change this:
-        private static int defaultSlices = 30;
-
+        /// <summary>
+        /// Number of slices to typically divide the line segment into per recursion level,
+        /// although some circumstances can change this:
+        /// </summary>
+        private static int defaultSlices = 50;
+        
+        /// <summary>
+        /// I refuse to allow my self to have more than this much of the amount of time a
+        /// single physics tick is meant to take to calculate during one update.  if the
+        /// algorithm is taking longer than this, then interrupt it where it is, save the
+        /// state of it, and come back to finish the calcultion next update.
+        /// This shouild be expressed as a number betwen 0 and 1.  i.e. 0.05 for "5%".
+        /// </summary>
+        public double tickPortionAllowed = 0.05;
+        
         private static double lightspeed = 299792458; // in m/s
 
         private double lastFailTime = 0.0;
         private Part laserPart;
-
+        
+        /// <summary>The max amount of distance below sea level that it's reasonable to assume a hit might occur.
+        /// Some bodies do have craters beneath the "sea" level - also there is continental shelf below the sea
+        /// on Kerbin.  Note there are no places that are over 1000 meters below sea level, but the number is so high
+        /// here because it might be being measured at a shallow angle.</summary>
+        private double underSeaFudge = 5000;
         
         public LaserPQSUtil( Part p )
         {
             laserPart = p;
+            millisecondCap = 1000.0 * (double)GameSettings.PHYSICS_FRAME_DT_LIMIT * tickPortionAllowed;
+            PrevDist = 0;
+            PrevSuccess = false;
         }
 
         /// <summary>
@@ -61,12 +139,17 @@ namespace LaserDist
         /// <returns>True if there was a hit, False if there wasn't</returns>
         public bool RayCast( Vector3d origin, Vector3d rayVec, out CelestialBody hitBody, out double dist )
         {
+            rayCastTimer = new System.Diagnostics.Stopwatch();
+            rayCastTimer.Reset();
+            rayCastTimer.Start();
+
+            bool done = true;
+
             double seaLevelDist = -1.0;
             hitBody = null;
             dist = -1.0;
 
-            // Start off with the sea level hit, knowing the terrain hit has to be no farther
-            // than that:
+            // Start off with the sea level hit.
             bool didHit = raySeaLevelCast( origin, rayVec, out hitBody, out seaLevelDist );
             if( didHit )
             {
@@ -91,15 +174,45 @@ namespace LaserDist
                 // ------------------------------------------------------------------------------
                 Vector3d pointingUnitVec = rayVec.normalized;
                 double terrainDist;
-                bool success = numericPQSSolver(
-                    out terrainDist, hitBody, origin, pointingUnitVec, iterationCap, seaLevelDist, defaultSlices );
-                if( success )
+                bool success = false;
+                if( UpdateAge==0 ) // start a new instance of the algorithm from scratch.
+                {
+                    if( debugMsg ) Debug.Log( "Starting fresh new numericPQSolver");
+                    success = numericPQSSolver(
+                        out terrainDist, out done, hitBody, origin, pointingUnitVec, seaLevelDist+underSeaFudge, defaultSlices );
+                }
+                else // continue the previous one:
+                {
+                    if( debugMsg ) Debug.Log( "Starting continuation numericPQSolver");
+                    success = numericPQSSolver(
+                        out terrainDist, out done, this.hitBody, this.origin, this.pointingUnitVec, this.dist, defaultSlices );
+                }
+                if( success && done)
                 {
                     didHit = true;
                     dist = terrainDist;
                 }
             }
+            rayCastTimer.Stop();
             
+            if( done )
+            {
+                PrevDist = dist;
+                PrevSuccess = didHit;
+                PrevBodyName = hitBody.name;
+                UpdateAge = 0;
+                if( debugMsg ) Debug.Log( "LaserPQSUtil.RayCast Returning a DONE state, having taken " +
+                                         Math.Round(rayCastTimer.Elapsed.TotalMilliseconds,3) + " millis with answer " +
+                                         didHit+":"+Math.Round(dist,2));
+            }
+            else
+            {
+                if( debugMsg ) Debug.Log( "LaserPQSUtil.RayCast Returning UNDONE state, having taken " + 
+                                         Math.Round(rayCastTimer.Elapsed.TotalMilliseconds,3) + " millis with answer " + 
+                                         didHit+":"+Math.Round(dist,2));
+                ++UpdateAge;
+            }
+
             return didHit;
         }
 
@@ -182,29 +295,32 @@ namespace LaserDist
         /// See this markdown file on github for the full explanation:
         ///     doc/Recursive_Numeric_Terrain_Hit.md
         /// </summary>
+        /// <param name="newDist">The "return value" (the actual return is bool, this is the distance if return is true).</param>
+        /// <param name="done">returns true if the algorithm came to a final answer, false it if needs more time.</param></param>
         /// <param name="hitBody">body of the terrain</param>
         /// <param name="origin">start of this line segment of the ray</param>
         /// <param name="pointingUnitVec">direction of the ray - must be a unit vector starting at origin</param>
-        /// <param name="itersLeft">Number of iterations allowed before exiting and accepting the answer so far</param>
         /// <param name="dist">length of this line segment of the ray</param>
         /// <param name="slices">Number of slices to try to cut the line segment into</param>
         /// <returns>The closer dist that was hit, or -1 if no hit found</returns>
         private bool numericPQSSolver(
             out double newDist,
+            out bool done,
             CelestialBody hitBody,
             Vector3d origin,
             Vector3d pointingUnitVec,
-            int itersLeft,
             double dist,
             int slices )
         {
-            Debug.Log( "numericPQSSolver( "+hitBody.name+", "+origin+", "+pointingUnitVec+", "+itersLeft+", "+dist+", "+slices+");");
+            if( debugMsg ) Debug.Log( "numericPQSSolver( (out),(out),"+hitBody.name+", "+origin+", "+pointingUnitVec+", "+dist+", "+slices+");");
             bool success = false;
+            bool continueNextTime = false;
             int i;
             double lat;
             double lng;
+            double segmentLength = 0.0;
             newDist = dist;
-            int slicesThisTime = Math.Min( itersLeft, slices );
+            int slicesThisTime = slices;
             Vector3d samplePoint = origin;
             Vector3d prevSamplePoint;
             // We already know i=0 is above ground, so start at i=1:
@@ -212,7 +328,7 @@ namespace LaserDist
             {
                 prevSamplePoint = samplePoint;
                 samplePoint = origin + (i*(dist/slicesThisTime))*pointingUnitVec;
-                double segmentLength = (samplePoint - prevSamplePoint).magnitude;
+                segmentLength = (samplePoint - prevSamplePoint).magnitude;
                 
                 if( segmentLength <= epsilon )
                     break;
@@ -231,17 +347,30 @@ namespace LaserDist
                 {
                     success = true;
                     double subSectionDist;
-                    numericPQSSolver( out subSectionDist, hitBody, prevSamplePoint, pointingUnitVec,
-                                      itersLeft - i, segmentLength, slices );
+                    bool subDone;
+                    numericPQSSolver( out subSectionDist, out subDone, hitBody, prevSamplePoint, pointingUnitVec,
+                                      segmentLength, slices );
+                    continueNextTime = ! subDone;
                     newDist = ((i-1)*(dist/slicesThisTime)) + subSectionDist;
                     break;
                 }
+                if( rayCastTimer.Elapsed.TotalMilliseconds > millisecondCap )
+                {
+                    this.hitBody = hitBody;
+                    this.origin = prevSamplePoint - pointingUnitVec*20; // back up 20 meters because the planet will move some
+                    this.pointingUnitVec = pointingUnitVec;
+                    this.dist = segmentLength * (slicesThisTime - i + 2);
+                    this.slices = slices;                    
+                    continueNextTime = true;
+                    break;
+                }
             }
-            Debug.Log( "numericPQSSolver reached i = "+ i );
+            if( debugMsg ) Debug.Log( "numericPQSSolver after " + Math.Round(rayCastTimer.Elapsed.TotalMilliseconds,3) + " millis i = "+ i + " and continueNextTime=" + continueNextTime );
             
-            if( i > slicesThisTime )
+            if( i > slicesThisTime && segmentLength > epsilon && !continueNextTime )
             {
-                // The above loop got to the end without finding a hit.
+                // The above loop got to the end without finding a hit, and the length of
+                // the line segments is still not so small as to be time to give up yet.
                 // Before giving up, it might be the case that there's a hit under the ground
                 // in-between the sample points that were tried, like this:
                 // 
@@ -253,16 +382,14 @@ namespace LaserDist
                 //       \____/            hit in            \______/         \__________
                 //                      between the
                 //                     sample points
-                //
-                // Therefore if there's enough itersLeft remaining to try again with a tighter
-                // sampling, then do so:
-                if( itersLeft-i >= slices )
-                {
-                    success = numericPQSSolver( out newDist, hitBody, origin, pointingUnitVec,
-                                                itersLeft - slicesThisTime, dist, 2*slices );
-                }
+                bool subDone = false;
+                if( debugMsg ) Debug.Log( "numericPQSSolver recursing.");
+                success = numericPQSSolver( out newDist, out subDone, hitBody, origin, pointingUnitVec,
+                                            dist, 2*slices );
+                continueNextTime = ! subDone;
             }
-            Debug.Log( "numericPQSSolver returning "+ success+ " dist="+newDist );
+            done = ! continueNextTime;
+            if( debugMsg ) Debug.Log( "numericPQSSolver returning "+ success+ " dist="+newDist+" done="+done );
             return success;
         }
         

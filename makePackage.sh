@@ -10,6 +10,7 @@
 
 # I copied the 7-ZIP 7z.exe file into my github /usr/bin to make this work:
 CMD_ZIP="7z"
+CMD_ZIP_ARGS="-tzip"
 
 # Location where your KSP game is installed:
 INSTALL_GAME_DIR="../../../../../Program Files (x86)/Steam/steamapps/common/Kerbal Space Program"
@@ -46,7 +47,7 @@ cp  LICENSE              "${EXPORT_DIR}/${MOD_NAME}"
 cp -r Parts "${EXPORT_DIR}/${MOD_NAME}/"
 mkdir "${EXPORT_DIR}/${MOD_NAME}/Plugins"
 cp -r src/LaserDist/bin/Debug/LaserDist.dll "${EXPORT_DIR}/${MOD_NAME}/Plugins"
-"$CMD_ZIP" a "${MOD_NAME}.zip" "${EXPORT_DIR}"
+"$CMD_ZIP" "$CMD_ZIP_ARGS" a "${MOD_NAME}.zip" "${EXPORT_DIR}"
 
 if [ "$DO_INSTALL" = "yes" ]
 then
