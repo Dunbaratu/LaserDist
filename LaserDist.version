@@ -6,7 +6,7 @@
   "GITHUB": {
     "USERNAME":Dunbaratu",
     "REPOSITORY":"LaserDist",
-    "ALLOW_PRE_RELEASE":false,
+    "ALLOW_PRE_RELEASE":false
   },
   "VERSION": {
     "MAJOR": 0,
