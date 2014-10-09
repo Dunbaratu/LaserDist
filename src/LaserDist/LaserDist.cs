@@ -287,17 +287,24 @@ namespace LaserDist
         /// </summary>
         private void drainPower()
         {
-            if( Activated )
+            if( isInEditor )
             {
-                float drainThisUpdate = (float) (ElectricPerSecond * deltaTime);
-                float actuallyUsed = part.RequestResource("ElectricCharge", drainThisUpdate);
-                if( actuallyUsed < drainThisUpdate/2.0 )
+                hasPower = true;
+            }
+            else
+            {
+                if( Activated )
                 {
-                    hasPower = false;
-                }
-                else
-                {
-                    hasPower = true;
+                    float drainThisUpdate = (float) (ElectricPerSecond * deltaTime);
+                    float actuallyUsed = part.RequestResource("ElectricCharge", drainThisUpdate);
+                    if( actuallyUsed < drainThisUpdate/2.0 )
+                    {
+                        hasPower = false;
+                    }
+                    else
+                    {
+                        hasPower = true;
+                    }
                 }
             }
         }

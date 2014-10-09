@@ -1,6 +1,17 @@
 Changes per version for LaserDist (in reverse order)
 ======================================================
 
+v0.4  KSP 0.25 compatibility update, and AVC support
+---------------------------------------------------
+
+Fixed:
+
+* The feature to view the laserbeam inside the editor (VAB or SPH) had stopped working.  The part was behaving as if it can't detect electrical power when in the VAB anymore, and thus it though it was starved of power.  Fixed by bypassing the powerdrain check while in the editor.
+
+New:
+
+* Support for Automatic Version Checker mod. If you use KSP-AVC, you should be able to get update stats about LaserDist automatically now.
+
 v0.3 Now ready for kOS when kOS Fields released?
 -------------------------------------------------------------------
 
