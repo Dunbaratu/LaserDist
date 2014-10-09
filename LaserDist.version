@@ -2,7 +2,7 @@
   "NAME": "LaserDist",
   "URL": "https://raw.githubusercontent.com/Dunbaratu/LaserDist/master/LaserDist.version",
   "DOWNLOAD":"https://github.com/Dunbaratu/LaserDist/releases/download/v0.4/LaserDist.zip",
-  "CHANGE_LOG_URL":"https://github.com/Dunbaratu/LaserDist/blob/master/ChangeLog.md",
+  "CHANGE_LOG_URL":"https://raw.githubusercontent.com/Dunbaratu/LaserDist/master/ChangeLog.md",
   "GITHUB": {
     "USERNAME":"Dunbaratu",
     "REPOSITORY":"LaserDist",
