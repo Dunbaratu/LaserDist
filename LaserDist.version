@@ -4,7 +4,7 @@
   "DOWNLOAD":"https://github.com/Dunbaratu/LaserDist/releases/download/v0.4/LaserDist.zip",
   "CHANGE_LOG_URL":"https://github.com/Dunbaratu/LaserDist/blob/master/ChangeLog.md",
   "GITHUB": {
-    "USERNAME":Dunbaratu",
+    "USERNAME":"Dunbaratu",
     "REPOSITORY":"LaserDist",
     "ALLOW_PRE_RELEASE":false
   },
