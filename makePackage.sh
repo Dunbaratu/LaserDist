@@ -16,7 +16,7 @@ CMD_ZIP_ARGS="-tzip"
 INSTALL_GAME_DIR="../../../../../Program Files (x86)/Steam/steamapps/common/Kerbal Space Program"
 
 # Change this to "no" if you want to suppress the install to your game:
-DO_INSTALL="yes"  #
+DO_INSTALL="no"  #
 
 # ------------------------------------------------------------
 # YOU SHOULDN'T NEED TO ALTER THE LINES FROM HERE DOWN:
