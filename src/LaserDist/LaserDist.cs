@@ -64,7 +64,16 @@ namespace LaserDist
         private bool hasPower = false;
         private double prevTime = 0.0;
         private double deltaTime = 0.0;
-                
+        
+        // These are settings that affect the color animation of the laser beam:
+        
+        private Color laserColor = new Color(1.0f,0.0f,0.0f);
+        private float laserOpacityAverage = 0.35f;
+        private float laserOpacityVariance = 0.15f;
+        private float laserOpacityFadeMin = 0.1f; // min opacity when at max distance.
+        private System.Random laserAnimationRandomizer = null;
+
+
         private GameObject lineObj = null;
         private LineRenderer line = null;
         private Int32 mask;
@@ -142,13 +151,14 @@ namespace LaserDist
                     + (1 << maskBitPartTriggers)
                     + (1 << maskBitWheelColliders)
                     + (1 << maskBitTerrainColliders) ;
-            
+
         }
 
         public override void OnActive()
         {
             GameEvents.onPartDestroyed.Add( OnLaserDestroy );
         }
+        
 
         // Actions to control the active flag:
         // ----------------------------------------
@@ -156,6 +166,8 @@ namespace LaserDist
         public void ActionToggle(KSPActionParam p)
         {
             Activated = ! Activated;
+            if( pqsTool != null )
+                pqsTool.Reset();
         }
 
         // Actions to control the visibility flag:
@@ -172,6 +184,8 @@ namespace LaserDist
             bool newVal = (hasPower && Activated && DrawLaser);
             if( newVal != isDrawing )
             {
+                if( pqsTool != null )
+                    pqsTool.Reset();
                 if( newVal )
                 {
                     startDrawing();
@@ -198,10 +212,12 @@ namespace LaserDist
             line = lineObj.AddComponent<LineRenderer>();
             
             line.material = new Material(Shader.Find("Particles/Additive") );
-            Color c1 = new Color( 1.0f,0.0f,0.0f,0.5f);
-            Color c2 = new Color( 1.0f,0.0f,0.0f,0.2f);
+            Color c1 = laserColor;
+            Color c2 = laserColor;
             line.SetColors( c1, c2 );
             line.enabled = true;
+
+            laserAnimationRandomizer = new System.Random();
         }
         
         /// <summary>
@@ -235,6 +251,8 @@ namespace LaserDist
             
             Activated = false;
             DrawLaser = false;
+            if( pqsTool != null )
+                pqsTool.Reset();
             ChangeIsDrawing();                
         }
 
@@ -436,9 +454,17 @@ namespace LaserDist
                 float width = 0.02f;
 
                 line.SetVertexCount(2);
-                line.SetWidth( width, width );
                 line.SetPosition( 0, useOrigin );
                 line.SetPosition( 1, useOrigin + usePointing*( (Distance>0)?Distance:MaxDistance ) );
+
+                // Make an animation effect where the laser's opacity varies on a sine-wave-over-time pattern:
+                Color c1 = laserColor;
+                Color c2 = laserColor;
+                c1.a = laserOpacityAverage + laserOpacityVariance * (laserAnimationRandomizer.Next(0,100) / 100f);
+                c2.a = laserOpacityFadeMin;
+                line.SetColors(c1,c2);
+                float tempWidth = width * (0.25f + (laserAnimationRandomizer.Next(0,75) / 100f));
+                line.SetWidth( tempWidth, tempWidth );
             }
         }
     }

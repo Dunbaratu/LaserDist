@@ -1,6 +1,22 @@
 Changes per version for LaserDist (in reverse order)
 ======================================================
 
+v0.5  Faster Numeric approximater, laser varying animation, kOS usage doc
+-------------------------------------------------------------------------
+
+Fixed:
+
+* CPUHOG slider had no effect.  Now it does.
+
+New:
+
+* Sped up numeric approximation algorithm by using body.pqsController.radiusMin and body.pqsController.radisuMax to set upper and lower bounds on the possible distances at which a terrain hit can occur.
+
+* [Added kOS usage doc](https://raw.githubusercontent.com/Dunbaratu/LaserDist/master/doc/Recursive_Numeric_Terrain_Hit.md)  (Note, usage in kOS doesn't work yet.  This is just the description of how it will be used when it's ready.
+
+* Added simple laser animation effect that makes the beam picture fluctuate and flicker a bit.
+
+
 v0.4  KSP 0.25 compatibility update, and AVC support
 ---------------------------------------------------
 
