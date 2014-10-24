@@ -374,19 +374,12 @@ namespace LaserDist
             pointing = this.part.transform.rotation * Vector3d.down;
             
             bool switchToNewHit = false;
-            RaycastHit thisFixedUpdateBestHit = new RaycastHit();
+            RaycastHit thisFixedUpdateBestHit;
             
             if( hasPower && Activated && origin != null && pointing != null)
             {
                 RaycastHit[] hits = null;
-                // hits = Physics.RaycastAll( origin, pointing, MaxDistance, mask );
-                RaycastHit theHit;
-                if( Physics.Raycast( origin, pointing, out theHit, MaxDistance, mask ))
-                {
-                    hits = new RaycastHit[1];
-                    hits[0] = theHit;
-                }
-                
+                hits = Physics.RaycastAll( origin, pointing, MaxDistance, mask );
                 Debug.Log( "  num hits = " + hits.Length );
                 if( hits.Length > 0 )
                 {
@@ -440,6 +433,8 @@ namespace LaserDist
                     }
                 }
 
+                // ThiS IS TEMPORARY  - Remove after debugging - it makes a purple line during FixedUpdate
+                // whenever the target changes to a new one:
                 if( switchToNewHit )
                 {
                     debuglineObj = new GameObject("LaserDist debug beam");
