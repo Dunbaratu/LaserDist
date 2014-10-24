@@ -55,7 +55,34 @@ namespace LaserDist
         /// The utility that solves raycasts for this laser.
         /// </summary>
         private LaserPQSUtil pqsTool;
+        
+        /// <summary>
+        /// Remember the object that had been hit by bestUnityRayCastDist
+        /// </summary>
+        private RaycastHit bestFixedUpdateHit = new RaycastHit();
 
+        /// <summary>
+        /// Track the number of Updates() there's been since having gotten a REAL hit on the
+        /// object that we are currently CLAIMING is the closest hit.  Only if there's been
+        /// several updates of "faking" the hit will we really change the hit to something else.
+        /// This is needed to workaround the fact that Physics.Raycast only seems to occasionally
+        /// hit the object and sometimes passes through it.
+        /// </summary>
+        private int updateForcedResultAge = 0;
+        
+        /// <summary>
+        /// Has there been at least one FixedUpdate() within the most recent Update() in which a "real" hit
+        /// has been registered?  
+        /// </summary>
+        private bool resetHitThisUpdate = false;
+
+        /// <summary>
+        /// When physics raycast fails to find a hit on the current best hit object, don't report it as a
+        /// failure unless it happens for this number of Update()'s in a row.  Physics.Raycast is really
+        /// buggy in KSP and will intermittently fail to find hits that are clearly right there:
+        /// </summary>
+        private static int consecutiveForcedResultsAllowed = 2;
+        
         private bool doStressTest = false; // There's a debug test I left in the code that this enables.
 
         private bool isDrawing = false;
@@ -76,6 +103,8 @@ namespace LaserDist
 
         private GameObject lineObj = null;
         private LineRenderer line = null;
+        private GameObject debuglineObj = null;
+        private LineRenderer debugline = null;
         private Int32 mask;
         private int maskBitDefault = 0;
         private int maskTransparentFX = 1;
@@ -98,7 +127,7 @@ namespace LaserDist
         [KSPField(isPersistant=true, guiName = "Hit", guiActive = true, guiActiveEditor = true)]
         public string HitName = "<none>";
 
-        /// <summary>Distance the laser is showing to the first collision:</summary>
+        /// <summary>Distance the laser is checking to the first collision:</summary>
         [KSPField(isPersistant=true, guiName = "Max Sensor Range", guiActive = true, guiActiveEditor = true, guiUnits = "m")]
         public float MaxDistance = 10000f;        
 
@@ -218,6 +247,7 @@ namespace LaserDist
             line.enabled = true;
 
             laserAnimationRandomizer = new System.Random();
+            bestFixedUpdateHit.distance = -1f;
         }
         
         /// <summary>
@@ -262,6 +292,7 @@ namespace LaserDist
         /// </summary>
         public override void OnUpdate()
         {
+            Debug.Log("eraseme: OnUpdte START");
             double nowTime = Planetarium.GetUniversalTime();
             
             pqsTool.tickPortionAllowed = (double) (CPUGreedyPercent / 100.0); // just in case user changed it in the slider.
@@ -327,6 +358,106 @@ namespace LaserDist
             }
         }
 
+
+        /// <summary>
+        /// Perform Unity's Physics.RayCast() check when the movement of all the objects is set in stone and they are not moving:
+        /// Physics.RayCast() is unreliable when called from Update() because objects are moving their positions during their
+        /// Update()'s and you don't know when during the order of all that your own Update() will be getting called.  Therefore
+        /// Physics.Raycast() has to be called during FixedUpdate.
+        /// </summary>
+        public void FixedUpdate()
+        {
+            Debug.Log( "eraseme: FixedUpdate START" );
+            // The location of origin is different in FixedUpdate than it is
+            // in Update, so it has to be reset in both:
+            origin = this.part.transform.TransformPoint( relLaserOrigin );
+            pointing = this.part.transform.rotation * Vector3d.down;
+            
+            bool switchToNewHit = false;
+            RaycastHit thisFixedUpdateBestHit = new RaycastHit();
+            
+            if( hasPower && Activated && origin != null && pointing != null)
+            {
+                RaycastHit[] hits = null;
+                // hits = Physics.RaycastAll( origin, pointing, MaxDistance, mask );
+                RaycastHit theHit;
+                if( Physics.Raycast( origin, pointing, out theHit, MaxDistance, mask ))
+                {
+                    hits = new RaycastHit[1];
+                    hits[0] = theHit;
+                }
+                
+                Debug.Log( "  num hits = " + hits.Length );
+                if( hits.Length > 0 )
+                {
+                    // Get the best existing hit on THIS fixedUpdate:
+                    thisFixedUpdateBestHit.distance = Mathf.Infinity;
+                    foreach( RaycastHit hit in hits )
+                    {
+                        if( hit.distance < thisFixedUpdateBestHit.distance )
+                            thisFixedUpdateBestHit = hit;
+                    }
+                    Debug.Log( "    thisFixedUpateBestHit = " + thisFixedUpdateBestHit.distance );
+                    // If it's the same object as the previous best hit, or there is no previous best hit, then use it:
+                    if( bestFixedUpdateHit.distance < 0  ||
+                        object.ReferenceEquals( thisFixedUpdateBestHit.collider.gameObject,
+                                                bestFixedUpdateHit.collider.gameObject ) )
+                    {
+                        Debug.Log( "      Resetting hit to new value because it's the same as prev best, or there was no prev best." );
+                        bestFixedUpdateHit = thisFixedUpdateBestHit;
+                        resetHitThisUpdate = true;
+                    }
+                    else
+                    {
+                        switchToNewHit = false;
+                        // If it's a different object that was hit, and it was closer, then take it as the hit:
+                        if( thisFixedUpdateBestHit.distance < bestFixedUpdateHit.distance )
+                            switchToNewHit = true;
+                        // If it's a different object that was hit, and it's farther, but there's been too many
+                        // instances of fixedupdates with forced bogus hitting old hits, then take it as the hit:
+                        else if( updateForcedResultAge >= consecutiveForcedResultsAllowed )
+                            switchToNewHit = true;
+
+                        if( switchToNewHit )
+                        {
+                            Debug.Log( "      Resetting hit to new value even though it's a different hit." );
+                            bestFixedUpdateHit = thisFixedUpdateBestHit;
+                            resetHitThisUpdate = true;
+                        }
+                        else
+                            Debug.Log( "      Keeping old best value because it's a different longer hit." );
+                    }
+                }
+                else
+                {
+                    Debug.Log( "  Raycast no hits." );
+                    if( updateForcedResultAge >= consecutiveForcedResultsAllowed )
+                    {
+                        Debug.Log( "    update is old enough to allow reset to nothing." );
+                        bestFixedUpdateHit = new RaycastHit(); // force it to count as a real miss.
+                        bestFixedUpdateHit.distance = -1f;
+                        resetHitThisUpdate = true;
+                    }
+                }
+
+                if( switchToNewHit )
+                {
+                    debuglineObj = new GameObject("LaserDist debug beam");
+                    debuglineObj.layer = maskTransparentFX;
+                    debugline = debuglineObj.AddComponent<LineRenderer>();
+            
+                    debugline.material = new Material(Shader.Find("Particles/Additive") );
+                    Color c1 = new Color(1.0f,0.0f,1.0f);
+                    Color c2 = c1;
+                    debugline.SetColors( c1, c2 );
+                    debugline.enabled = true;
+                    debugline.SetWidth(0.01f,0.01f);
+                    debugline.SetPosition( 0, origin );
+                    debugline.SetPosition( 1, origin + pointing*thisFixedUpdateBestHit.distance );
+                }
+            }
+        }
+
         /// <summary>
         ///   Recalculates the distance to a hit item, or -1f if nothing
         ///   was hit by the laser.
@@ -334,20 +465,30 @@ namespace LaserDist
         /// <returns></returns>
         private void castUpdate()
         {
+            if( resetHitThisUpdate )
+                updateForcedResultAge = 0;
+            else
+                ++updateForcedResultAge;
+            
             float newDist = -1f;
+            // The location of origin is different in FixedUpdate than it is
+            // in Update, so it has to be reset in both:
+            origin = this.part.transform.TransformPoint( relLaserOrigin );
+            pointing = this.part.transform.rotation * Vector3d.down;
             HitName = "<none>";
-            if( hasPower & Activated )
+            if( hasPower && Activated && origin != null && pointing != null )
             {
-                origin = this.part.transform.TransformPoint( relLaserOrigin );
-                pointing = this.part.transform.rotation * Vector3d.down;
-
                 // the points on the map-space corresponding to these points is different:
                 mapOrigin = ScaledSpace.LocalToScaledSpace( origin );
                 mapPointing = pointing;
 
-                RaycastHit hit;
-                if( Physics.Raycast(origin, pointing, out hit, MaxDistance, mask) )
+                if( bestFixedUpdateHit.distance >= 0 )
                 {
+                    Debug.Log( "  using local raycast result." );
+                    UpdateAge = updateForcedResultAge;
+                    
+                    RaycastHit hit = bestFixedUpdateHit;
+
                     newDist = hit.distance;
                     
                     // Walk up the UnityGameObject tree trying to find an object that is
@@ -387,13 +528,16 @@ namespace LaserDist
                 // through it), then try the more expensive pqs ray cast solver.
                 if( newDist < 0 || newDist > 100000 )
                 {
+                    Debug.Log( "  numeric solver starting:." );
                     double pqsDist;
                     CelestialBody pqsBody;
                     bool success = pqsTool.RayCast( origin, pointing, out pqsBody, out pqsDist );
                     if( pqsTool.UpdateAge == 0 )
                     {
+                        Debug.Log( "    UpdateAge == 0." );
                         if( success )
                         {
+                            Debug.Log( "      success." );
                             // If it's a closer hit than we have already, then use it:
                             if( pqsDist < newDist || newDist < 0 )
                             {
@@ -404,11 +548,14 @@ namespace LaserDist
                     }
                     else
                     {
+                        Debug.Log( "    UpdateAge != 0." );
                         if( pqsTool.PrevSuccess )
                         {
+                            Debug.Log( "      prevsuccess." );
                             // If it's a closer hit than we have already, then use it:
                             if( pqsTool.PrevDist < newDist || newDist < 0 )
                             {
+                                Debug.Log( "      prevsuccess." );
                                 HitName = pqsTool.PrevBodyName;
                                 newDist = (float) pqsTool.PrevDist;
                             }
@@ -418,7 +565,8 @@ namespace LaserDist
                 }
             }
             Distance = newDist;
-            
+            Debug.Log( "Distance = "+Distance );
+            resetHitThisUpdate = false;
         }
 
         /// <summary>
