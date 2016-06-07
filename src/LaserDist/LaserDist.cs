@@ -299,12 +299,11 @@ namespace LaserDist
 
             deltaTime = nowTime - prevTime;
             prevTime = nowTime;
-            
-            PhysicsRaycaster();
 
-            ChangeIsDrawing();
             drainPower();
+            PhysicsRaycaster();
             castUpdate();
+            ChangeIsDrawing();
             drawUpdate();
             
             if( doStressTest )
@@ -366,7 +365,7 @@ namespace LaserDist
             // force the origin position to be based on the state just after FixedUpdate, since that's what
             // Physics.Raycast is really basing its checks on, not the current new positions in the various
             // gameObject's .transforms that may have changed.
-            origin = this.part.transform.TransformPoint( relLaserOrigin ) - (this.part.rigidbody.velocity * Time.deltaTime);
+            origin = this.part.transform.TransformPoint( relLaserOrigin );
             pointing = this.part.transform.rotation * Vector3d.down;
             
             bool switchToNewHit = false;
