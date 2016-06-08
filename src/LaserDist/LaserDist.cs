@@ -432,7 +432,7 @@ namespace LaserDist
 
                 // ThiS IS TEMPORARY  - Remove after debugging - it makes a purple line during LateUpdate
                 // whenever the target changes to a new one:
-                if( false )
+                if( switchToNewHit )
                 {
                     debuglineObj = new GameObject("LaserDist debug beam");
                     debuglineObj.layer = maskTransparentFX;
