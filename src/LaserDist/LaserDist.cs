@@ -29,6 +29,17 @@ namespace LaserDist
     {
         private bool debugMsg = false;
         private bool debugLineDraw = false;
+
+        /// <summary>
+        /// We want to do the work once per FixedUpdate(), but NOT during the
+        /// midst of the Fixeduodate() since that means half the other parts in the game
+        /// have moved their objects for the next tick and half haven't yet.  That
+        /// causes raycasts to become unreliable and cofusing.
+        /// So instead we just flag that a FixedUpdate() has occurred, and let the next Update()
+        /// just after that FixedUpdate() do the work. (but if additional Update()s happen more often
+        /// than FixedUpdates, the "extra" Update()s won't do the work.)
+        /// </summary>
+        private bool fixedUpdateHappened = false;
         
         /// <summary>
         ///   Laser's origin relative to the part's coord transform:
@@ -286,14 +297,27 @@ namespace LaserDist
                 pqsTool.Reset();
             ChangeIsDrawing();                
         }
+        
+        
+        public void FixedUpdate()
+        {
+            fixedUpdateHappened = true;
+        }
 
         /// <summary>
         ///   Gets new distance reading if the device is on,
         ///   and handles the toggling of the display of the laser.
         /// </summary>
-        public void FixedUpdate()
+        public void Update()
         {
-            DebugMsg("eraseme: FixedUpdate START");
+            if( ! fixedUpdateHappened )
+            {
+                DebugMsg("Update: a FixedUpdate hasn't happened yet, so skipping.");
+                return;
+            }
+            DebugMsg("Update: A new FixedUpdate happened, so doing the full work this time.");
+            fixedUpdateHappened = false;
+            
             double nowTime = Planetarium.GetUniversalTime();
             
             pqsTool.tickPortionAllowed = (double) (CPUGreedyPercent / 100.0); // just in case user changed it in the slider.
