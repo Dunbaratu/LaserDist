@@ -178,7 +178,7 @@ namespace LaserDist
         public override void OnAwake()
         {
             moduleName = "LaserDistModule";
-            relLaserOrigin = new Vector3d(0.0,-0.3,0.0);
+            relLaserOrigin = new Vector3d(0.0,0.0,0.0);
             pqsTool = new LaserPQSUtil(part);
             pqsTool.tickPortionAllowed = (double) (CPUGreedyPercent / 100.0);
             
@@ -391,7 +391,7 @@ namespace LaserDist
             // Physics.Raycast is really basing its checks on, not the current new positions in the various
             // gameObject's .transforms that may have changed.
             origin = this.part.transform.TransformPoint( relLaserOrigin );
-            pointing = this.part.transform.rotation * Vector3d.down;
+            pointing = this.part.transform.rotation * Vector3d.up;
             
             bool switchToNewHit = false;
             RaycastHit thisLateUpdateBestHit = new RaycastHit();
@@ -491,7 +491,7 @@ namespace LaserDist
             // The location of origin is different in LateUpdate than it is
             // in Update, so it has to be reset in both:
             origin = this.part.transform.TransformPoint( relLaserOrigin );
-            pointing = this.part.transform.rotation * Vector3d.down;
+            pointing = this.part.transform.rotation * Vector3d.up;
             HitName = "<none>";
             if( hasPower && Activated && origin != null && pointing != null )
             {
