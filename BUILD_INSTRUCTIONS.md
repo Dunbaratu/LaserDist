@@ -24,7 +24,10 @@ For further information, see the file called
 Add these as references to your project, from the KSP distribution folders: (Assume "$KSP_HOME" is the location you've installed Kerbal Space Program.)
 
 * $KSP_HOME/KSP_Data/Managed/Assembly-CSharp.dll
+* $KSP_HOME/KSP_Data/Managed/Assembly-CSharp-firstpass.dll
+* $KSP_HOME/KSP_Data/Managed/KSPUtil.dll
 * $KSP_HOME/KSP_Data/Managed/UnityEngine.dll
+* $KSP_HOME/KSP_Data/Managed/UnityEngine.UI.dll
 
 Build the project using the project file src/LaserDist/LaserDist.csproj
 

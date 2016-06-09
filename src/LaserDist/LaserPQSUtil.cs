@@ -172,7 +172,7 @@ namespace LaserDist
                 Vector3d pointingUnitVec = rayVec.normalized;
                 double terrainDist;
                 bool success = false;
-                if( debugMsg ) Debug.Log( "Starting continuation numericPQSolver");
+                DebugMsg( "Starting continuation numericPQSolver");
                 success = numericPQSSolver(
                     out terrainDist, out done, this.hitBody, this.origin, this.pointingUnitVec, this.dist, defaultSlices );
                 hitBody = this.hitBody;
@@ -211,7 +211,7 @@ namespace LaserDist
                     bool success = false;
                     hitBody = laserPart.vessel.GetOrbit().referenceBody;
 
-                    if( debugMsg ) Debug.Log( "Starting fresh new numericPQSolver");
+                    DebugMsg( "Starting fresh new numericPQSolver");
 
                     // Start the ray at the lower bound of where the hit might be:
                     Vector3d closerOrigin = origin + distanceLowerBound*pointingUnitVec;
@@ -235,15 +235,15 @@ namespace LaserDist
                 PrevSuccess = didHit;
                 PrevBodyName = hitBody.name;
                 Reset();
-                if( debugMsg ) Debug.Log( "LaserPQSUtil.RayCast Returning a DONE state, having taken " +
-                                         Math.Round(rayCastTimer.Elapsed.TotalMilliseconds,3) + " millis with answer " +
-                                         didHit+":"+Math.Round(dist,2));
+                DebugMsg( "LaserPQSUtil.RayCast Returning a DONE state, having taken " +
+                          Math.Round(rayCastTimer.Elapsed.TotalMilliseconds,3) + " millis with answer " +
+                          didHit+":"+Math.Round(dist,2));
             }
             else
             {
-                if( debugMsg ) Debug.Log( "LaserPQSUtil.RayCast Returning UNDONE state, having taken " + 
-                                         Math.Round(rayCastTimer.Elapsed.TotalMilliseconds,3) + " millis with answer " + 
-                                         didHit+":"+Math.Round(dist,2));
+                DebugMsg( "LaserPQSUtil.RayCast Returning UNDONE state, having taken " + 
+                          Math.Round(rayCastTimer.Elapsed.TotalMilliseconds,3) + " millis with answer " + 
+                          didHit+":"+Math.Round(dist,2));
                 ++UpdateAge;
             }
 
@@ -272,18 +272,18 @@ namespace LaserDist
             out double lowerBoundDist,
             out double upperBoundDist)
         {
-            if( debugMsg ) Debug.Log( "raySphereLevelCast( "+origin+","+rayVec+","+inBody+"(out hitBody),(out dist));" );
+            DebugMsg( "raySphereLevelCast( "+origin+","+rayVec+","+inBody+"(out hitBody),(out dist));" );
 
             List<CelestialBody> bodies;
 
             if (inBody == null)
             {
-                if( debugMsg ) Debug.Log( "raySphereLevelCast checking all bodies." );
+                DebugMsg( "raySphereLevelCast checking all bodies." );
                 bodies = FlightGlobals.Bodies;
             }
             else
             {
-                if( debugMsg ) Debug.Log( "raySphereLevelCast checking body "+inBody+"." );
+                DebugMsg( "raySphereLevelCast checking body "+inBody+"." );
                 bodies = new List<CelestialBody>();
                 bodies.Add(inBody);
             }
@@ -300,7 +300,7 @@ namespace LaserDist
             // nearer of those hits.)
             foreach( CelestialBody body in bodies )
             {
-                if( debugMsg ) Debug.Log( "raySphereLevelCast Now checking for "+body+"." );
+                DebugMsg( "raySphereLevelCast Now checking for "+body+"." );
                 PQS pqs = body.pqsController;
                 if( pqs != null )
                 {
@@ -357,7 +357,7 @@ namespace LaserDist
             {
                 lastFailTime = now;
             }
-            if( debugMsg ) Debug.Log( "raySphereLevelCast returning "+hitFound+", out hitBody="+hitBody+", out dist="+upperBoundDist);
+            DebugMsg( "raySphereLevelCast returning "+hitFound+", out hitBody="+hitBody+", out dist="+upperBoundDist);
             return hitFound;
         }
         
@@ -392,7 +392,7 @@ namespace LaserDist
                 return false;
             }
             
-            if( debugMsg ) Debug.Log( "numericPQSSolver( (out),(out),"+hitBody.name+", "+origin+", "+pointingUnitVec+", "+dist+", "+slices+");");
+            DebugMsg( "numericPQSSolver( (out),(out),"+hitBody.name+", "+origin+", "+pointingUnitVec+", "+dist+", "+slices+");");
             bool success = false;
             bool continueNextTime = false;
             bool hasOcean = hitBody.ocean;
@@ -409,7 +409,7 @@ namespace LaserDist
                 continueNextTime = false;
                 success = this.honingSuccess;
                 newDist = dist;
-                if( debugMsg ) Debug.Log( "dist is now small enough to quit.  continue="+continueNextTime+", success="+success );
+                DebugMsg( "dist is now small enough to quit.  continue="+continueNextTime+", success="+success );
             }
             else
             {
@@ -432,7 +432,7 @@ namespace LaserDist
                 
                     if( samplePointAlt <= groundAlt || (hasOcean && samplePointAlt < 0) )
                     {
-                        if( debugMsg ) Debug.Log( "Found a below ground: samplePointAlt="+samplePointAlt + ", groundAlt="+groundAlt );
+                        DebugMsg( "Found a below ground: samplePointAlt="+samplePointAlt + ", groundAlt="+groundAlt );
                         success = true;
                         this.honingSuccess = true;
                         double subSectionDist;
@@ -445,7 +445,7 @@ namespace LaserDist
                     }
                     if( rayCastTimer.Elapsed.TotalMilliseconds > millisecondCap )
                     {
-                        if( debugMsg ) Debug.Log( "Ran out of milliseconds: " + rayCastTimer.Elapsed.TotalMilliseconds + " > " + millisecondCap );
+                        DebugMsg( "Ran out of milliseconds: " + rayCastTimer.Elapsed.TotalMilliseconds + " > " + millisecondCap );
                         this.hitBody = hitBody;
                         this.origin = prevSamplePoint - pointingUnitVec*20; // back up 20 meters because the planet will move some
                         this.pointingUnitVec = pointingUnitVec;
@@ -455,7 +455,7 @@ namespace LaserDist
                         break;
                     }
                 }
-                if( debugMsg ) Debug.Log( "numericPQSSolver after " + Math.Round(rayCastTimer.Elapsed.TotalMilliseconds,3) + " millis i = "+ i + " and continueNextTime=" + continueNextTime );
+                DebugMsg( "numericPQSSolver after " + Math.Round(rayCastTimer.Elapsed.TotalMilliseconds,3) + " millis i = "+ i + " and continueNextTime=" + continueNextTime );
             
                 if( i > slicesThisTime && segmentLength > epsilon && !continueNextTime )
                 {
@@ -473,14 +473,14 @@ namespace LaserDist
                     //                      between the
                     //                     sample points
                     bool subDone = false;
-                    if( debugMsg ) Debug.Log( "numericPQSSolver recursing.");
+                    DebugMsg( "numericPQSSolver recursing.");
                     success = numericPQSSolver( out newDist, out subDone, hitBody, origin, pointingUnitVec,
                                                 dist, 2*slices );
                     continueNextTime = ! subDone;
                 }
             }
             done = ! continueNextTime;
-            if( debugMsg ) Debug.Log( "numericPQSSolver returning "+ success+ " dist="+newDist+" done="+done );
+            DebugMsg( "numericPQSSolver returning "+ success+ " dist="+newDist+" done="+done );
             return success;
         }
         
@@ -527,7 +527,7 @@ namespace LaserDist
         /// <returns>True if intersect found, false if no intersect was detected (in which case nearDist and farDist are both returned as -1.0)</returns>
         private bool GetRayIntersectSphere( Vector3d rayStart, Vector3d rayVec, Vector3d center, double radius, out double nearDist, out double farDist)
         {
-            if( debugMsg ) Debug.Log( "GetRayIntersectSphere("+rayStart+","+rayVec+","+center+","+radius+",(out),(out));" );
+            DebugMsg( "GetRayIntersectSphere("+rayStart+","+rayVec+","+center+","+radius+",(out),(out));" );
 
             // The math algorithm is explained in this long ascii art comment:
             //
@@ -625,22 +625,28 @@ namespace LaserDist
             double thetaRadians = Vector3d.Angle( rayVec, center - rayStart ) * 0.0174532925; // 0.0174532925 = Pi/180
             double lengthHypotenuse = (center - rayStart).magnitude;
             double lengthC0ToC1       = Math.Sin(thetaRadians) * lengthHypotenuse;
-            if( debugMsg ) Debug.Log( "GetRayIntersectSphere: thetaRadians="+thetaRadians+" lengthHyp="+lengthHypotenuse+" lengthC0ToC1="+lengthC0ToC1);
+            DebugMsg( "GetRayIntersectSphere: thetaRadians="+thetaRadians+" lengthHyp="+lengthHypotenuse+" lengthC0ToC1="+lengthC0ToC1);
             if (lengthC0ToC1 > radius)
             {
                 nearDist = -1.0;
                 farDist = -1.0;
-                if( debugMsg ) Debug.Log( "GetRayIntersectSphere returning: "+false+", nearDist="+nearDist+", farDist="+farDist );
+                DebugMsg( "GetRayIntersectSphere returning: "+false+", nearDist="+nearDist+", farDist="+farDist );
                 return false;
             }
             double lengthP0ToC1 = Math.Cos(thetaRadians) * lengthHypotenuse;
             double lengthC1ToL1 = Math.Sqrt( Math.Pow(radius,2) - Math.Pow(lengthC0ToC1,2) );
-            if( debugMsg ) Debug.Log( "GetRayIntersectSphere: legnthP0ToC1="+lengthP0ToC1+" lengthC1ToL1="+lengthC1ToL1);
+            DebugMsg( "GetRayIntersectSphere: legnthP0ToC1="+lengthP0ToC1+" lengthC1ToL1="+lengthC1ToL1);
             
             nearDist = lengthP0ToC1 - lengthC1ToL1;
             farDist = lengthP0ToC1 + lengthC1ToL1;
-            if( debugMsg ) Debug.Log( "GetRayIntersectSphere returning: "+true+", nearDist="+nearDist+", farDist="+farDist );
+            DebugMsg( "GetRayIntersectSphere returning: "+true+", nearDist="+nearDist+", farDist="+farDist );
             return true;
+        }
+
+        private void DebugMsg(string message)
+        {
+            if( debugMsg )
+                DebugMsg(message);
         }
     }
 }

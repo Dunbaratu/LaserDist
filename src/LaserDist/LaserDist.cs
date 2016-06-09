@@ -28,6 +28,7 @@ namespace LaserDist
     public class LaserDistModule : PartModule
     {
         private bool debugMsg = false;
+        private bool debugLineDraw = false;
         
         /// <summary>
         ///   Laser's origin relative to the part's coord transform:
@@ -290,9 +291,9 @@ namespace LaserDist
         ///   Gets new distance reading if the device is on,
         ///   and handles the toggling of the display of the laser.
         /// </summary>
-        public void Update()
+        public void FixedUpdate()
         {
-            Debug.Log("eraseme: Update START");
+            DebugMsg("eraseme: FixedUpdate START");
             double nowTime = Planetarium.GetUniversalTime();
             
             pqsTool.tickPortionAllowed = (double) (CPUGreedyPercent / 100.0); // just in case user changed it in the slider.
@@ -317,9 +318,9 @@ namespace LaserDist
                 int numQueries = 1000;
                 System.Diagnostics.Stopwatch timer = new System.Diagnostics.Stopwatch();
                 timer.Start();
-                pqsTool.StressTestPQS(part.vessel.GetOrbit().referenceBody, numQueries);
+                pqsTool.StressTestPQS( part.vessel.GetOrbit().referenceBody, numQueries );
                 timer.Stop();
-                if( debugMsg ) UnityEngine.Debug.Log( "StressTestPQS: for " + numQueries + ", " + timer.Elapsed.TotalMilliseconds + "millis" );
+                DebugMsg( "StressTestPQS: for " + numQueries + ", " + timer.Elapsed.TotalMilliseconds + "millis" );
             }
         }
 
@@ -337,7 +338,7 @@ namespace LaserDist
                 if( Activated )
                 {
                     float drainThisUpdate = (float) (ElectricPerSecond * deltaTime);
-                    float actuallyUsed = part.RequestResource("ElectricCharge", drainThisUpdate);
+                    float actuallyUsed = part.RequestResource( "ElectricCharge", drainThisUpdate );
                     if( actuallyUsed < drainThisUpdate/2.0 )
                     {
                         hasPower = false;
@@ -359,14 +360,14 @@ namespace LaserDist
         /// </summary>
         public void PhysicsRaycaster()
         {
-            Debug.Log( "eraseme: PhysicsRaycaster START" );
+            DebugMsg( "eraseme: PhysicsRaycaster START" );
 
             // The location of origin is wherever this part WAS just after the most recent FixedUpdate cycle was done,
             // but BEFORE it may have been moved by its own Update() that might have happened.  The premise is to
             // force the origin position to be based on the state just after FixedUpdate, since that's what
             // Physics.Raycast is really basing its checks on, not the current new positions in the various
             // gameObject's .transforms that may have changed.
-            origin = this.part.transform.TransformPoint( relLaserOrigin ) - (this.part.rigidbody.velocity * Time.deltaTime);
+            origin = this.part.transform.TransformPoint( relLaserOrigin ) - (this.part.vel * Time.deltaTime);
             pointing = this.part.transform.rotation * Vector3d.down;
             
             bool switchToNewHit = false;
@@ -376,7 +377,7 @@ namespace LaserDist
             {
                 RaycastHit[] hits = null;
                 hits = Physics.RaycastAll( origin, pointing, MaxDistance, mask );
-                Debug.Log( "  num hits = " + hits.Length );
+                DebugMsg( "  num hits = " + hits.Length );
                 if( hits.Length > 0 )
                 {
                     // Get the best existing hit on THIS lateUpdate:
@@ -386,7 +387,7 @@ namespace LaserDist
                         if( hit.distance < thisLateUpdateBestHit.distance )
                             thisLateUpdateBestHit = hit;
                     }
-                    Debug.Log( "    thisLateUpateBestHit = " + thisLateUpdateBestHit.distance );
+                    DebugMsg( "    thisLateUpateBestHit = " + thisLateUpdateBestHit.distance );
                     // If it's the same object as the previous best hit, or there is no previous best hit, then use it:
                     if( bestLateUpdateHit.distance < 0  ||
                         bestLateUpdateHit.collider == null ||
@@ -394,7 +395,7 @@ namespace LaserDist
                         object.ReferenceEquals( thisLateUpdateBestHit.collider.gameObject,
                                                 bestLateUpdateHit.collider.gameObject ) )
                     {
-                        Debug.Log( "      Resetting hit to new value because it's the same as prev best, or there was no prev best." );
+                        DebugMsg( "      Resetting hit to new value because it's the same as prev best, or there was no prev best." );
                         bestLateUpdateHit = thisLateUpdateBestHit;
                         resetHitThisUpdate = true;
                     }
@@ -411,29 +412,29 @@ namespace LaserDist
 
                         if( switchToNewHit )
                         {
-                            Debug.Log( "      Resetting hit to new value even though it's a different hit." );
+                            DebugMsg( "      Resetting hit to new value even though it's a different hit." );
                             bestLateUpdateHit = thisLateUpdateBestHit;
                             resetHitThisUpdate = true;
                         }
                         else
-                            Debug.Log( "      Keeping old best value because it's a different longer hit." );
+                            DebugMsg( "      Keeping old best value because it's a different longer hit." );
                     }
                 }
                 else
                 {
-                    Debug.Log( "  Raycast no hits." );
+                    DebugMsg( "  Raycast no hits." );
                     if( updateForcedResultAge >= consecutiveForcedResultsAllowed )
                     {
-                        Debug.Log( "    update is old enough to allow reset to nothing." );
+                        DebugMsg( "    update is old enough to allow reset to nothing." );
                         bestLateUpdateHit = new RaycastHit(); // force it to count as a real miss.
                         bestLateUpdateHit.distance = -1f;
                         resetHitThisUpdate = true;
                     }
                 }
 
-                // ThiS IS TEMPORARY  - Remove after debugging - it makes a purple line during LateUpdate
+                // If showing debug lines, this makes a purple line during LateUpdate
                 // whenever the target changes to a new one:
-                if( switchToNewHit )
+                if( debugLineDraw && switchToNewHit )
                 {
                     debuglineObj = new GameObject("LaserDist debug beam");
                     debuglineObj.layer = maskTransparentFX;
@@ -477,7 +478,7 @@ namespace LaserDist
 
                 if( bestLateUpdateHit.distance >= 0 )
                 {
-                    Debug.Log( "  using local raycast result." );
+                    DebugMsg( "  using local raycast result." );
                     UpdateAge = updateForcedResultAge;
                     
                     RaycastHit hit = bestLateUpdateHit;
@@ -521,16 +522,16 @@ namespace LaserDist
                 // through it), then try the more expensive pqs ray cast solver.
                 if( newDist < 0 || newDist > 100000 )
                 {
-                    Debug.Log( "  numeric solver starting:." );
+                    DebugMsg( "  numeric solver starting:." );
                     double pqsDist;
                     CelestialBody pqsBody;
                     bool success = pqsTool.RayCast( origin, pointing, out pqsBody, out pqsDist );
                     if( pqsTool.UpdateAge == 0 )
                     {
-                        Debug.Log( "    UpdateAge == 0." );
+                        DebugMsg( "    UpdateAge == 0." );
                         if( success )
                         {
-                            Debug.Log( "      success." );
+                            DebugMsg( "      success." );
                             // If it's a closer hit than we have already, then use it:
                             if( pqsDist < newDist || newDist < 0 )
                             {
@@ -541,14 +542,14 @@ namespace LaserDist
                     }
                     else
                     {
-                        Debug.Log( "    UpdateAge != 0." );
+                        DebugMsg( "    UpdateAge != 0." );
                         if( pqsTool.PrevSuccess )
                         {
-                            Debug.Log( "      prevsuccess." );
+                            DebugMsg( "      prevsuccess." );
                             // If it's a closer hit than we have already, then use it:
                             if( pqsTool.PrevDist < newDist || newDist < 0 )
                             {
-                                Debug.Log( "      prevsuccess." );
+                                DebugMsg( "      prevsuccess." );
                                 HitName = pqsTool.PrevBodyName;
                                 newDist = (float) pqsTool.PrevDist;
                             }
@@ -558,7 +559,7 @@ namespace LaserDist
                 }
             }
             Distance = newDist;
-            Debug.Log( "Distance = "+Distance );
+            DebugMsg( "Distance = "+Distance );
             resetHitThisUpdate = false;
         }
 
@@ -607,6 +608,12 @@ namespace LaserDist
                 float tempWidth = width * (0.25f + (laserAnimationRandomizer.Next(0,75) / 100f));
                 line.SetWidth( tempWidth, tempWidth );
             }
+        }
+        
+        private void DebugMsg(string message)
+        {
+            if( debugMsg )
+                DebugMsg(message);
         }
     }
 }
