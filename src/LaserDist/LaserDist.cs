@@ -198,6 +198,7 @@ namespace LaserDist
         public override void OnActive()
         {
             GameEvents.onPartDestroyed.Add( OnLaserDestroy );
+            GameEvents.onEditorShipModified.Add( OnLaserAttachDetach );
         }
         
 
@@ -289,7 +290,7 @@ namespace LaserDist
             // in the game, not just when the part being destroyed is this one,
             // so don't do anything if it's the wrong part.
             //
-            if (p != this.part) return;
+            if( p != this.part ) return;
             
             Activated = false;
             DrawLaser = false;
@@ -298,6 +299,13 @@ namespace LaserDist
             ChangeIsDrawing();                
         }
         
+        public void OnLaserAttachDetach(ShipConstruct sc)
+        {
+            // If this laser part isn't on the ship anymore, turn off the drawing.
+            if( ! sc.Parts.Contains(this.part))
+                stopDrawing();
+        }
+                
         
         public void FixedUpdate()
         {
@@ -377,20 +385,12 @@ namespace LaserDist
 
 
         /// <summary>
-        /// Perform Unity's Physics.RayCast() check when the movement of all the objects is set in stone and they are not moving:
-        /// Physics.RayCast() is unreliable when called from Update() or LateUpdate() because objects are moving their positions during their
-        /// Update()'s and you don't know when during the order of all that your own Update() will be getting called.  Therefore
-        /// Physics.Raycast() has to be called during LateUpdate.
+        /// Perform Unity's Physics.RayCast() check:
         /// </summary>
         public void PhysicsRaycaster()
         {
             DebugMsg( "eraseme: PhysicsRaycaster START" );
 
-            // The location of origin is wherever this part WAS just after the most recent FixedUpdate cycle was done,
-            // but BEFORE it may have been moved by its own Update() that might have happened.  The premise is to
-            // force the origin position to be based on the state just after FixedUpdate, since that's what
-            // Physics.Raycast is really basing its checks on, not the current new positions in the various
-            // gameObject's .transforms that may have changed.
             origin = this.part.transform.TransformPoint( relLaserOrigin );
             pointing = this.part.transform.rotation * Vector3d.up;
             
@@ -487,7 +487,6 @@ namespace LaserDist
                 updateForcedResultAge = 0;
             else
                 ++updateForcedResultAge;
-            
             float newDist = -1f;
             // The location of origin is different in LateUpdate than it is
             // in Update, so it has to be reset in both:
@@ -511,7 +510,7 @@ namespace LaserDist
                     
                     // Walk up the UnityGameObject tree trying to find an object that is
                     // something the user will be familiar with:
-                    GameObject hitObject = hit.transform.gameObject;
+                    GameObject hitObject = (hit.transform == null ? null : hit.transform.gameObject);
                     if( hitObject != null )
                     {
                         HitName = hitObject.name; // default if the checks below don't work.
@@ -527,12 +526,16 @@ namespace LaserDist
                             // - no more crashing into boulders
                             // - shoot them with lasers! (and then drive around them)
                             PQSMod_LandClassScatterQuad scatter = hitObject.GetComponentInParent<PQSMod_LandClassScatterQuad>();
-                            if (scatter != null) {
+                            if( scatter != null )
+                            {
                                 HitName = scatter.transform.parent.name; // the name of the Scatter, eg. "Scatter boulder".
-                            } else {
+                            }
+                            else
+                            {
                                 // Fallback to the body.
                                 CelestialBody body = hitObject.GetComponentInParent<CelestialBody>();
-                                if (body != null) {
+                                if( body != null )
+                                {
                                     HitName = body.name;
                                 }
                             }

@@ -166,7 +166,13 @@ namespace LaserDist
             bool didHit = false;
             hitBody = null;
             dist = -1.0;
-                
+            
+            // It's impossible to hit a body while in the VAB/SPH, because the
+            // calculation uses the vessel's current orbit, which is null while
+            // in the editor, so just hard code it to a fail in that case:
+            if( HighLogic.LoadedSceneIsEditor )
+                return false;
+            
             if( UpdateAge > 0 )
             {
                 Vector3d pointingUnitVec = rayVec.normalized;
