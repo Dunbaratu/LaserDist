@@ -323,9 +323,10 @@ namespace LaserDist
             pqsTool.tickPortionAllowed = (double) (CPUGreedyPercent / 100.0); // just in case user changed it in the slider.
 
             deltaTime = nowTime - prevTime;
+            if( prevTime > 0 ) // Skips the power drain if it's the very first Update() after the scene load.
+                drainPower();
             prevTime = nowTime;
 
-            drainPower();
             PhysicsRaycaster();
             castUpdate();
             ChangeIsDrawing();
