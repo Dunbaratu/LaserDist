@@ -299,12 +299,11 @@ namespace LaserDist
 
             deltaTime = nowTime - prevTime;
             prevTime = nowTime;
-            
-            PhysicsRaycaster();
 
-            ChangeIsDrawing();
             drainPower();
+            PhysicsRaycaster();
             castUpdate();
+            ChangeIsDrawing();
             drawUpdate();
             
             if( doStressTest )
@@ -366,7 +365,7 @@ namespace LaserDist
             // force the origin position to be based on the state just after FixedUpdate, since that's what
             // Physics.Raycast is really basing its checks on, not the current new positions in the various
             // gameObject's .transforms that may have changed.
-            origin = this.part.transform.TransformPoint( relLaserOrigin ) - (this.part.rigidbody.velocity * Time.deltaTime);
+            origin = this.part.transform.TransformPoint( relLaserOrigin );
             pointing = this.part.transform.rotation * Vector3d.down;
             
             bool switchToNewHit = false;
@@ -433,7 +432,7 @@ namespace LaserDist
 
                 // ThiS IS TEMPORARY  - Remove after debugging - it makes a purple line during LateUpdate
                 // whenever the target changes to a new one:
-                if( switchToNewHit )
+                if( false )
                 {
                     debuglineObj = new GameObject("LaserDist debug beam");
                     debuglineObj.layer = maskTransparentFX;
@@ -498,10 +497,18 @@ namespace LaserDist
                         // has a KSP component assigned to it:
                         if( hitObject.layer == 15 )
                         {
-                            CelestialBody body = hitObject.GetComponentInParent<CelestialBody>();
-                            if( body != null )
-                            {
-                                HitName = body.name;
+                            // Support Kopernicus scatter colliders
+                            // - no more crashing into boulders
+                            // - shoot them with lasers! (and then drive around them)
+                            PQSMod_LandClassScatterQuad scatter = hitObject.GetComponentInParent<PQSMod_LandClassScatterQuad>();
+                            if (scatter != null) {
+                                HitName = scatter.transform.parent.name; // the name of the Scatter, eg. "Scatter boulder".
+                            } else {
+                                // Fallback to the body.
+                                CelestialBody body = hitObject.GetComponentInParent<CelestialBody>();
+                                if (body != null) {
+                                    HitName = body.name;
+                                }
                             }
                         }
                         else
