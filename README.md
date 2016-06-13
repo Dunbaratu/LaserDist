@@ -22,7 +22,7 @@ Copyright (C) 2014,2015,2016 Steven Mading (aka Dunbaratu on Github)
 madings@gmail.com
 
 
-This is a vey small plugin.  It makes a KSP Part that
+This is a very small plugin.  It makes a KSP Part that
 measures straight line distances by laser.
 
 The "Beamer 100x Disto-o-meter" Part aims a laser in a line
