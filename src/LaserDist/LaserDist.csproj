@@ -58,6 +58,11 @@
   <ItemGroup>
     <Compile Include="LaserDist.cs" />
     <Compile Include="LaserPQSUtil.cs" />
+    <Compile Include="obj\Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="obj" />
+    <Folder Include="obj\Properties" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

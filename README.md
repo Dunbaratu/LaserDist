@@ -1,8 +1,8 @@
 LaserDist
 =========
 
-[WIP, Plugin, Parts] LaserDist 0.1 for KSP 0.23.5, Alpha
---------------------------------------------------------
+[WIP, Plugin, Parts] LaserDist 0.9 for KSP 1.1.2
+------------------------------------------------
 
 Releases:
 
@@ -18,7 +18,7 @@ License:
 
 * GPL v3
 
-Copyright (C) 2014 Steven Mading (aka Dunbaratu on Github)
+Copyright (C) 2014,2015,2016 Steven Mading (aka Dunbaratu on Github)
 madings@gmail.com
 
 
@@ -28,7 +28,8 @@ measures straight line distances by laser.
 The "Beamer 100x Disto-o-meter" Part aims a laser in a line
 and then measures the distance in meters to the first object
 the laser hits.  The result is displayed in the right-click
-menu for the part.
+menu for the part and can be read by kOS (and other?) script
+mods.
 
 ![LaserDist screenshot 1](readme_screenshot1.png)
 
@@ -146,19 +147,38 @@ of this mod or not.
 
 ### How do I use it from my script then?
 
-Very Soon Now(tm) the dev team of kOS (of which I'm part) plans to
-have a release that lets you read the fields of any part's KSPFields
-(The stuff you see in the rightclick popup user interface panels), and
-manipulate any part's widgets on the rightclick menus (the buttons,
-the sliders, etc).
+Quick synopsis:
 
-The plan from the beginning was to make LaserDist be a good test case
-of this feature that may actually be useful in its own right.
+Getting a handle on the laser, then turning on the laser using that module:
+```
+SET laser_module TO SHIP:MODULESNAMED("LaserDistModule")[0].
+IF not laser_module:GETFIELD("Enabled") {
+  laser_module:SETFIELD("Enabled",true).
+}
+```
+Getting a reading from the laser:
+```
+SET laser_module TO SHIP:MODULESNAMED("LaserDistModule")[0].
+PRINT "Laser distance is measuring " + laser_module:GETFIELD("Distance") + " meters."
+PRINT "Laser is hitting: " + laser_module:GETFIELD("Hit").
+```
+Transforming the laser reading into a 3-D coord:
 
-But that's not released just yet.  So at the moment this is only
-usable as a manual piloting aid where you leave the part menu open
-and look at it by eye as you fly.
+The part model is designed such that emitter of the laser line is located exactly
+at the part's local transform origin position, aimed along the part's
+``facing:vector`` unit vector, allowing you to get its 3D vector position from
+a script like so:
 
+```
+SET laser_module TO SHIP:MODULESNAMED("LaserDistModule")[0].
+set dist to laser_module:GETFIELD("Distance").
+set emitter_position to laser_module:part:position.
+set emitter_unit_vec to laser_module:part:facing:vector.
+set laser_hit_position to emitter_position + (dist * emitter_unit_vec).
+```
+// laser_hit_position is now a 3D vector position of where the laser hit something.
+
+```
 ### Part modeling help?
 
 I am aware that the artwork on the model isn't pretty.  I'm a 
