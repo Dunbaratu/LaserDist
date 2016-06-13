@@ -89,7 +89,7 @@ to be.
 ![LaserDist Rightclick panel 1](rightpanel.png)
 
 * KSPField: 'Distance' is a float - the number of meters being shown in the display.  It's -1 if there is currently no hit.
-* KSPField: 'HitName' is a string - the name of the object being hit.
+* KSPField: 'Hit' is a string - the name of the object being hit.
 * KSPField: 'Activated' is a bool - true if the measuring device is on. 
 * KSPField: 'DrawLaser' is a bool (called "Visible" in the GUI) - true if the laser should be drawn when it's activated or false if it should be (realistically) invisible because, hey, it's coherent light and it's not supposed to be seen from the side.
 * KSPField: 'CPUGreedyPercent' is a float (called "CPU hog" in the GUI) ranging from 0.0 to 20.0.  It's how much of a single physics tick of time this mod will allow itself to consume during a single Update.  If it hasn't gotten a good enough answer within that much time, it will wait until the next update to continue the calculation.
