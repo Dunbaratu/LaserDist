@@ -1,6 +1,22 @@
 Changes per version for LaserDist (in reverse order)
 ======================================================
 
+v0.9.1  Bendability
+-------------------
+
+New:
+* Added 2 new laserdist parts that are capable of bending their lasers.  One only bends horizontally, and the other bends in 2 axes.
+
+Known issues:
+* Some of the textures on the new parts refuse to render in the little icons in the parts bins in the VAB, but they show up correctly once picked up and moved into the assembly area to attach to a vessel.  In the icon view, the part looks all white.
+* All the laser parts that are capable of bending lasers must bend them with the same max range for x as each other, and the same max range for y as each other.  You can't have one laser that bends from, say, -20 to +20 and another one that bends from -10 to +10.  If you edit the part.cfg to violate this rule, the context menus get screwy.  See the large comment in the part.cfg files about this if you want to edit the part.cfg files, or use ModuleManager to edit them.
+
+v0.9  Unity 5 and KSP 1.1.2
+---------------------------
+
+Updated finally after a long absence, to work with KSP 1.1.2.
+
+
 v0.5  Faster Numeric approximater, laser varying animation, kOS usage doc
 -------------------------------------------------------------------------
 
