@@ -12,7 +12,8 @@ CMD_ZIP="C:/Program Files/7-Zip/7z.exe"
 CMD_ZIP_ARGS="-tzip"
 
 # Location where your KSP game is installed:
-INSTALL_GAME_DIR="D:/KSP_Twitch - mod testing"
+#INSTALL_GAME_DIR="D:/KSP mod sandbox"
+INSTALL_GAME_DIR="D:/KSP_twitch"
 
 # Change this to "yes" if you want to install the ZIP to your game after it gets made:
 # Change this to "no" if you want to suppress the install to your game and just make the ZIP only:

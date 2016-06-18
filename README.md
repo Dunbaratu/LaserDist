@@ -25,6 +25,10 @@ madings@gmail.com
 This is a very small plugin.  It makes a KSP Part that
 measures straight line distances by laser.
 
+This module ships with 3 different models of Laser:
+
+### 100x model
+
 The "Beamer 100x Disto-o-meter" Part aims a laser in a line
 and then measures the distance in meters to the first object
 the laser hits.  The result is displayed in the right-click
@@ -37,6 +41,24 @@ The direction of the laser is whichever way the laser gun is
 pointed when you mounted it on the craft, as demonstrated here:
 
 ![LaserDist screenshot 2](readme_screenshot2.png)
+
+### 200x model
+
+The "Beamer 200x Bendable Disto-o-meter" Part is the same as
+the 100x part described above, but it lets you choose a
+deflection angle with the "Bend X" widget on the slider,
+(or by using SETFIELD in kOS on it), and the laser can dynamically
+change it's aim along this one axis.
+
+### 500x model
+
+The "Beamer 500x Aimable Disto-o-meter" Part is the same as
+the 200x part described above, but it lets you bend the laser
+in two different axes, to aim it whereever you like within
+a zone, using both "Bend X" and "Bend Y" settings.
+
+
+### All models:
 
 The laser can work over long distances - here it's measuring the
 distance from a Kerbin orbit vessel to the Mun:
@@ -94,6 +116,10 @@ to be.
 * KSPField: 'DrawLaser' is a bool (called "Visible" in the GUI) - true if the laser should be drawn when it's activated or false if it should be (realistically) invisible because, hey, it's coherent light and it's not supposed to be seen from the side.
 * KSPField: 'CPUGreedyPercent' is a float (called "CPU hog" in the GUI) ranging from 0.0 to 20.0.  It's how much of a single physics tick of time this mod will allow itself to consume during a single Update.  If it hasn't gotten a good enough answer within that much time, it will wait until the next update to continue the calculation.
 * KSPField: 'UpdateAge' is an integer - It's how many Unity Updates (animation frames, basically) it's been since the value you are seeing was calculated.  Becuase of the logic of CPUGreedyPercent (see above) sometimes the value being displayed is stale by a few update ticks and shouldn't be trusted until the next time that UpdateAge becomes zero again.  If you're in a situation where this mod needs to spend more than 1 update of time to get to a good answer for the distance, you'll see this value spinning a bit, quickly going 0,1,2,3,0,1,2,3,0,1,2,3...etc.  When you see that, only when it hit the zeros was the distance value perfectly correct at THAT moment.
+* KSPField: 'Bend X' is a float - the number of degrees the laser is deflected in its relative Yaw direction, if it's the type of laser that can be deflected.
+* KSPField: 'Bend Y' is a float - the number of degrees the laser is deflected in its relative Pitch direction, if it's the type of laser that can be deflected.
+* KSPField: 'Max Bend X' is a float - the range of bending the laser can do in its relative Yaw direction.  If this is zero, then the laser cannot bend that way.  The range is always centered at zero, plus or minus this number.
+* KSPField: 'Max Bend Y' is a float - the range of bending the laser can do in its relative Pitch direction.  If this is zero, then the laser cannot bend that way.  The range is always centered at zero, plus or minus this number.
 
 Note: The higher that CPUGreedyPercent ("CPU hog") is, the less likely it is that UpdateAge will ever be nonzero, but the bigger hit your framerate might take.
 
@@ -167,7 +193,9 @@ Transforming the laser reading into a 3-D coord:
 The part model is designed such that emitter of the laser line is located exactly
 at the part's local transform origin position, aimed along the part's
 ``facing:vector`` unit vector, allowing you to get its 3D vector position from
-a script like so:
+a script like so, *Provided you haven't bent the laser with the ``"Bend X"``
+or ``"Bend Y"`` settings.  If you have bent the laser, then you need to apply
+these offset angles yourself with an ANGLEAXIS rotation in kOS:
 
 ```
 SET laser_module TO SHIP:MODULESNAMED("LaserDistModule")[0].
@@ -178,10 +206,28 @@ set laser_hit_position to emitter_position + (dist * emitter_unit_vec).
 ```
 // laser_hit_position is now a 3D vector position of where the laser hit something.
 
+// To do the same general thing but when the ``Bend X`` and ``Bend Y`` fields are nonzero,
+// rotate the vector around the part's facing unit vectors:
+```
+SET laser_module TO SHIP:MODULESNAMED("LaserDistModule")[0].
+set dist to laser_module:GETFIELD("Distance").
+set emitter_position to laser_module:part:position.
+set emitter_center_vec to laser_module:part:facing:vector.
+set x_bend to laser_module:GETFIELD("Bend X").
+set y_bend to laser_module:GETFIELD("Bend Y").
+set bending_rotation to
+      angleaxis(x_bend, laser_module:part:facing:topvector) *
+      angleaxis(y_bend, laser_module:part:facing:starvector).
+set emitter_unit_vec to 
+      bending_rotation * emitter_center_vec.
+set laser_hit_position to emitter_position + (dist * emitter_unit_vec).
+```
+
+
 ```
 ### Part modeling help?
 
-I am aware that the artwork on the model isn't pretty.  I'm a 
+I am aware that the artwork on the models aren't pretty.  I'm a 
 programmer, not a graphic artist, and I don't have experience
 with things like Maya and Blender.  In fact I just made the model
 by slapping together some stretched Cube and Cylnder objects in

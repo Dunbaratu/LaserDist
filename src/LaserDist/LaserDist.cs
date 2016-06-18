@@ -27,7 +27,7 @@ namespace LaserDist
     /// </summary>
     public class LaserDistModule : PartModule
     {
-        private bool debugMsg = false;
+        private bool debugMsg = true;
         private bool debugLineDraw = false;
 
         /// <summary>
@@ -48,20 +48,24 @@ namespace LaserDist
         /// <summary>
         ///   Laser's origin in Unity World coords:
         /// </summary>
-        Vector3d origin;
+        private Vector3d origin;
         /// <summary>
-        ///   Laser's pointing unit vector in Unity World coords:
+        ///   Laser's pointing unit vector in Unity World coords before x/y deflection was applied.
         /// </summary>
-        Vector3d pointing;
+        private Vector3d rawPointing;
+        /// <summary>
+        ///   Laser's pointing unit vector in Unity World coords after x/y deflection has been applied.
+        /// </summary>
+        private Vector3d pointing;
 
         /// <summary>
         ///   Laser's origin in the map view's coords:
         /// </summary>
-        Vector3d mapOrigin;
+        private Vector3d mapOrigin;
         /// <summary>
-        ///   Laser's pointing unit vector in the map view's coords:
+        ///   The value of `pointing`, after it has been transformed into map coords.
         /// </summary>
-        Vector3d mapPointing;
+        private Vector3d mapPointing;
         
         /// <summary>
         /// The utility that solves raycasts for this laser.
@@ -143,6 +147,14 @@ namespace LaserDist
         [KSPField(isPersistant=true, guiName = "Max Sensor Range", guiActive = true, guiActiveEditor = true, guiUnits = "m")]
         public float MaxDistance = 10000f;        
 
+        /// <summary>Distance the laser is checking to the first collision:</summary>
+        [KSPField(isPersistant=true, guiName = "Max Bend X", guiActive = true, guiActiveEditor = true, guiUnits = "deg")]
+        public float MaxBendX = 0f;        
+
+        /// <summary>Distance the laser is checking to the first collision:</summary>
+        [KSPField(isPersistant=true, guiName = "Max Bend Y", guiActive = true, guiActiveEditor = true, guiUnits = "deg")]
+        public float MaxBendY = 0f;        
+
         /// <summary>Flag controlling whether or not to see the laserbeam onscreen</summary>
         [KSPField(isPersistant=true, guiName = "Visible", guiActive = true, guiActiveEditor = true),
          UI_Toggle(disabledText="no", enabledText="yes")]
@@ -156,6 +168,16 @@ namespace LaserDist
         /// <summary>electric usage per second that it's on:</summary>
         [KSPField(isPersistant=true, guiName = "Electricity Drain", guiActive = true, guiActiveEditor = true, guiUnits = "/sec", guiFormat = "N2")]
         public float ElectricPerSecond = 0.0f;
+        
+        /// <summary>How far to bend the laser beam relative to the part's "right" yaw. Negative values bend left.</summary>
+        [KSPField(isPersistant=true, guiName = "Bend X", guiActive = false, guiActiveEditor = false, guiUnits = "deg", guiFormat = "N2")]
+        [UI_FloatRange(minValue = -15, maxValue = 15, stepIncrement = 0.1f)]
+        public float BendX = 0.0f;
+
+        /// <summary>How far to bend the laser beam relative to the part's "up" pitch. Negative values bend down.</summary>
+        [KSPField(isPersistant=true, guiName = "Bend Y", guiActive = false, guiActiveEditor = false, guiUnits = "deg", guiFormat = "N2")]
+        [UI_FloatRange(minValue = -15, maxValue = 15, stepIncrement = 0.1f)]
+        public float BendY = 0.0f;
 
         /// <summary>
         /// How greedy is this mod at using the CPU to come up with an answer every tick?  If the value is too large,
@@ -171,8 +193,83 @@ namespace LaserDist
         [KSPField(isPersistant=true, guiName = "Update Age", guiActive = true, guiActiveEditor = true, guiUnits = " update(s)")]
         public int UpdateAge = 0;
         
+        [KSPEvent(guiName = "Zero Bend", guiActive = false, guiActiveEditor = false)]
+        public void ZeroBend()
+        {   BendX = 0f;
+            BendY = 0f;
+        }
+
         /// <summary>
-        /// Unity calls this hook during the KSP initial startup screen:
+        /// Configures context menu settings that vary depending on part.cfg settings per part,
+        /// and therefore can't be configured in the C# attributes syntax (which is set in stone
+        /// at compile time as static data that can't change per instance).
+        /// </summary>
+        private void SetGuiFieldsFromSettings()
+        {
+            // FIXME: The logic of the code below doesn't seem to be able to support having
+            // multiple different instances of this PartModule that have different max and min
+            // values for the float ranges.  It seems that whichever instance edited it's max/min
+            // settings most recently, it ends up applying that to ALL the other ones too.
+            // As far as I can tell it's acting like all the instances share the same UI_FloatRange
+            // settings, like they're static for the class or something.
+            // Strangely, this only seems to be a problem in the Flight view.  In the VAB/SPH,
+            // I can actually get several different ranges on the rightclick menues.  But in the
+            // Flight view, They're all the same, and it's always the settings for whichever of the
+            // parts happens to have been loaded onto the vessel last.
+            //
+            // Because of this problem, for now I'm releasing the parts with all having the same
+            // deflection range until I can understand this problem.
+
+            BaseField field;
+
+            DebugMsg("LaserDist is trying to config GUI panel fields from settings:");
+            DebugMsg(String.Format("Part name = {0}, MaxBendX = {1}, MaxBendY = {2}", part.name, MaxBendX, MaxBendY));
+            
+            field = Fields["BendX"];
+            ((UI_FloatRange)field.uiControlEditor).minValue = -MaxBendX;
+            ((UI_FloatRange)field.uiControlEditor).maxValue = MaxBendX;
+            if( MaxBendX == 0f )
+            {   field.guiActive = false;
+                field.guiActiveEditor = false;
+            }
+            else
+            {   field.guiActive = true;
+                field.guiActiveEditor = true;
+            }
+            
+            field = Fields["BendY"];
+            ((UI_FloatRange)field.uiControlEditor).minValue = -MaxBendY;
+            ((UI_FloatRange)field.uiControlEditor).maxValue = MaxBendY;
+            if( MaxBendY == 0f )
+            {   field.guiActive = false;
+                field.guiActiveEditor = false;
+            }
+            else
+            {   field.guiActive = true;
+                field.guiActiveEditor = true;
+            }
+            
+            BaseEvent evt = Events["ZeroBend"];
+            if( MaxBendX == 0f && MaxBendY == 0f )
+            {
+                evt.guiActive = false;
+                evt.guiActiveEditor = false;
+            }
+            else
+            {   evt.guiActive = true;
+                evt.guiActiveEditor = true;
+            }
+        }
+        
+        public override void OnStart(StartState state)
+        {
+            // Have to keep re-doing this from several hooks because
+            // KSP keeps annoyingly forgetting my float range changes.
+            SetGuiFieldsFromSettings();
+        }
+        
+        /// <summary>
+        /// Unity calls this hook during the activation of the partmodule on a part.
         /// </summary>
         /// <param name="state"></param>
         public override void OnAwake()
@@ -181,7 +278,9 @@ namespace LaserDist
             relLaserOrigin = new Vector3d(0.0,0.0,0.0);
             pqsTool = new LaserPQSUtil(part);
             pqsTool.tickPortionAllowed = (double) (CPUGreedyPercent / 100.0);
-            
+        
+            SetGuiFieldsFromSettings();
+
             mask =  (1 << maskBitDefault)
                     + (1 << maskBitWater)
                     + (1 << maskBitPartsList)
@@ -192,7 +291,6 @@ namespace LaserDist
                     + (1 << maskBitPartTriggers)
                     + (1 << maskBitWheelColliders)
                     + (1 << maskBitTerrainColliders) ;
-
         }
 
         public override void OnActive()
@@ -201,7 +299,6 @@ namespace LaserDist
             GameEvents.onEditorShipModified.Add( OnLaserAttachDetach );
         }
         
-
         // Actions to control the active flag:
         // ----------------------------------------
         [KSPAction("toggle")]
@@ -219,8 +316,7 @@ namespace LaserDist
         {
             DrawLaser = ! DrawLaser;
         }
-        
-        
+
         private void ChangeIsDrawing()
         {
             bool newVal = (hasPower && Activated && DrawLaser);
@@ -311,6 +407,27 @@ namespace LaserDist
         {
             fixedUpdateHappened = true;
         }
+        
+        /// <summary>
+        /// Recalculate the pointing vector and origin point based on part current position and bending deflections.
+        /// </summary>
+        private void UpdatePointing()
+        {
+            origin = this.part.transform.TransformPoint( relLaserOrigin );
+            rawPointing = this.part.transform.rotation * Vector3d.up;
+            
+            if( MaxBendX > 0f || MaxBendY > 0f )
+            {   // Doubles would be better than Floats here, but these come from user
+                // interface rightclick menu fields that KSP demands be floats:
+                Quaternion BendRotation =
+                    Quaternion.AngleAxis(BendX, this.part.transform.forward) *
+                    Quaternion.AngleAxis(BendY, this.part.transform.right);
+                pointing = BendRotation * rawPointing;
+            }
+            else
+            {   pointing = rawPointing;
+            }
+        }
 
         /// <summary>
         ///   Gets new distance reading if the device is on,
@@ -391,8 +508,7 @@ namespace LaserDist
         {
             DebugMsg( "eraseme: PhysicsRaycaster START" );
 
-            origin = this.part.transform.TransformPoint( relLaserOrigin );
-            pointing = this.part.transform.rotation * Vector3d.up;
+            UpdatePointing();
             
             bool switchToNewHit = false;
             RaycastHit thisLateUpdateBestHit = new RaycastHit();
@@ -488,10 +604,11 @@ namespace LaserDist
             else
                 ++updateForcedResultAge;
             float newDist = -1f;
+            
             // The location of origin is different in LateUpdate than it is
             // in Update, so it has to be reset in both:
-            origin = this.part.transform.TransformPoint( relLaserOrigin );
-            pointing = this.part.transform.rotation * Vector3d.up;
+            UpdatePointing();
+            
             HitName = "<none>";
             if( hasPower && Activated && origin != null && pointing != null )
             {
@@ -640,7 +757,7 @@ namespace LaserDist
                 c1.a = laserOpacityAverage + laserOpacityVariance * (laserAnimationRandomizer.Next(0,100) / 100f);
                 c2.a = laserOpacityFadeMin;
                 line.SetColors(c1,c2);
-                float tempWidth = width * (0.25f + (laserAnimationRandomizer.Next(0,75) / 100f));
+                float tempWidth = width * (0.25f + (laserAnimationRandomizer.Next(0,25) / 100f));
                 line.SetWidth( tempWidth, tempWidth );
             }
         }
@@ -648,7 +765,7 @@ namespace LaserDist
         private void DebugMsg(string message)
         {
             if( debugMsg )
-                DebugMsg(message);
+                System.Console.WriteLine(message);
         }
     }
 }
