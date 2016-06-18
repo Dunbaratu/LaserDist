@@ -195,7 +195,7 @@ at the part's local transform origin position, aimed along the part's
 ``facing:vector`` unit vector, allowing you to get its 3D vector position from
 a script like so, *Provided you haven't bent the laser with the ``"Bend X"``
 or ``"Bend Y"`` settings.  If you have bent the laser, then you need to apply
-these offset angles yourself with an ANGLEAXIS rotation in kOS:
+these offset angles yourself with an ANGLEAXIS rotation in kOS* :
 
 ```
 SET laser_module TO SHIP:MODULESNAMED("LaserDistModule")[0].
@@ -204,10 +204,12 @@ set emitter_position to laser_module:part:position.
 set emitter_unit_vec to laser_module:part:facing:vector.
 set laser_hit_position to emitter_position + (dist * emitter_unit_vec).
 ```
+
 // laser_hit_position is now a 3D vector position of where the laser hit something.
 
 // To do the same general thing but when the ``Bend X`` and ``Bend Y`` fields are nonzero,
 // rotate the vector around the part's facing unit vectors:
+
 ```
 SET laser_module TO SHIP:MODULESNAMED("LaserDistModule")[0].
 set dist to laser_module:GETFIELD("Distance").
