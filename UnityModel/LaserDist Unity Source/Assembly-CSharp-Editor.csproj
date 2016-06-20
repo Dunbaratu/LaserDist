@@ -50,6 +50,26 @@
      <Compile Include="Assets\PartTools_KSP11_2\PartTools\Editor\PartToolsEditor.cs" />
      <Compile Include="Assets\PartTools_KSP11_2\PartTools\Editor\PartToolsWindows.cs" />
      <Compile Include="Assets\PartTools_KSP11_2\PartTools\Editor\PropEditor.cs" />
+     <None Include="Assets\SquadCore\Shaders\ParticleAlpha.shader" />
+     <None Include="Assets\SquadCore\Shaders\EmissiveSpecular.shader" />
+     <None Include="Assets\Plugins\KSPAssets\ReadMe.txt" />
+     <None Include="Assets\SquadCore\Shaders\CutoffBumped.shader" />
+     <None Include="Assets\SquadCore\Shaders\SpecularBumpTransparent.shader" />
+     <None Include="Assets\SquadCore\Shaders\Bumped.shader" />
+     <None Include="Assets\SquadCore\Shaders\Emissive.shader" />
+     <None Include="Assets\SquadCore\Shaders\Unlit.shader" />
+     <None Include="Assets\SquadCore\Shaders\BumpedSpecular.shader" />
+     <None Include="Assets\SquadCore\Shaders\Cutoff.shader" />
+     <None Include="Assets\SquadCore\Shaders\SpecularTransparent.shader" />
+     <None Include="Assets\SquadCore\Shaders\EmissiveBumpedSpecular.shader" />
+     <None Include="Assets\SquadCore\Shaders\AlphaSpecular.shader" />
+     <None Include="Assets\SquadCore\Shaders\Diffuse.shader" />
+     <None Include="Assets\SquadCore\Shaders\Alpha.shader" />
+     <None Include="Assets\SquadCore\Shaders\Specular.shader" />
+     <None Include="Assets\SquadCore\Shaders\KSPParticle AddSmooth.shader" />
+     <None Include="Assets\SquadCore\Shaders\UnlitTransparent.shader" />
+     <None Include="Assets\SquadCore\Shaders\SolidColorAlpha.shader" />
+     <None Include="Assets\SquadCore\Shaders\ParticleAdd.shader" />
  <Reference Include="UnityEngine.Advertisements">
  <HintPath>C:/Program Files/Unity/Editor/Data/UnityExtensions/Unity/Advertisements/UnityEngine.Advertisements.dll</HintPath>
  </Reference>
@@ -76,6 +96,12 @@
  </Reference>
  <Reference Include="PartToolsEditor">
  <HintPath>C:/Users/Steve/Documents/GitHub/LaserDist/UnityModel/LaserDist Unity Source/Assets/PartTools_KSP11_2/PartTools/Lib/PartToolsEditor.dll</HintPath>
+ </Reference>
+ <Reference Include="KSPAssetCompiler">
+ <HintPath>C:/Users/Steve/Documents/GitHub/LaserDist/UnityModel/LaserDist Unity Source/Assets/Plugins/KSPAssets/KSPAssetCompiler.dll</HintPath>
+ </Reference>
+ <Reference Include="KSPAssets">
+ <HintPath>C:/Users/Steve/Documents/GitHub/LaserDist/UnityModel/LaserDist Unity Source/Assets/Plugins/KSPAssets/KSPAssets.dll</HintPath>
  </Reference>
  <Reference Include="UnityEditor.Graphs">
  <HintPath>C:/Program Files/Unity/Editor/Data/Managed/UnityEditor.Graphs.dll</HintPath>
