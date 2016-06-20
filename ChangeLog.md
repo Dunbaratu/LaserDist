@@ -1,6 +1,13 @@
 Changes per version for LaserDist (in reverse order)
 ======================================================
 
+v0.9.2  Just Small Visual Bug Fixes
+-----------------------------------
+
+Fixed:
+* The laser beam lines now properly disappear when you remove symmetry parts in the VAB or SPH.
+* Parts now render with color in the VAB/SPH parts bin.  Appearently even if all you want is a simple flat monocolor shader, you still need to use a texture image file for it in the way KSP works.  For example, to make a simple bland flat surface in color RGB(1,0,0), you'd have to do it by making a small image file consisting of 1 single pixel in color RGB(1,0,0), and using that in a texture.  Apparently the only shader effects that KSP enables when rendering the part icons is the texture image mapper.  All other aspects of shaders besides that one feature are turned off in the icon view, even for the shaders that come from KSP itself in PartTools.
+
 v0.9.1  Bendability
 -------------------
 
