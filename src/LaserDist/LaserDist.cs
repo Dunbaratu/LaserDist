@@ -27,7 +27,7 @@ namespace LaserDist
     /// </summary>
     public class LaserDistModule : PartModule
     {
-        private bool debugMsg = true;
+        private bool debugMsg = false;
         private bool debugLineDraw = false;
 
         /// <summary>
