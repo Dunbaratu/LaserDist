@@ -395,6 +395,11 @@ namespace LaserDist
             ChangeIsDrawing();                
         }
         
+        public void OnDestroy()
+        {
+            OnLaserDestroy(this.part); // another way to catch it when a part is detached.
+        }
+        
         public void OnLaserAttachDetach(ShipConstruct sc)
         {
             // If this laser part isn't on the ship anymore, turn off the drawing.
