@@ -392,12 +392,14 @@ namespace LaserDist
             DrawLaser = false;
             if( pqsTool != null )
                 pqsTool.Reset();
-            ChangeIsDrawing();                
+            ChangeIsDrawing();
         }
         
         public void OnDestroy()
         {
             OnLaserDestroy(this.part); // another way to catch it when a part is detached.
+            GameEvents.onPartDestroyed.Remove( OnLaserDestroy );
+            GameEvents.onEditorShipModified.Remove( OnLaserAttachDetach );
         }
         
         public void OnLaserAttachDetach(ShipConstruct sc)
