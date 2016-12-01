@@ -171,12 +171,12 @@ namespace LaserDist
         
         /// <summary>How far to bend the laser beam relative to the part's "right" yaw. Negative values bend left.</summary>
         [KSPField(isPersistant=true, guiName = "Bend X", guiActive = false, guiActiveEditor = false, guiUnits = "deg", guiFormat = "N2")]
-        [UI_FloatRange(minValue = -15, maxValue = 15, stepIncrement = 0.1f)]
+        [UI_FloatRange(minValue = -15, maxValue = 15, stepIncrement = 0.001f)]
         public float BendX = 0.0f;
 
         /// <summary>How far to bend the laser beam relative to the part's "up" pitch. Negative values bend down.</summary>
         [KSPField(isPersistant=true, guiName = "Bend Y", guiActive = false, guiActiveEditor = false, guiUnits = "deg", guiFormat = "N2")]
-        [UI_FloatRange(minValue = -15, maxValue = 15, stepIncrement = 0.1f)]
+        [UI_FloatRange(minValue = -15, maxValue = 15, stepIncrement = 0.001f)]
         public float BendY = 0.0f;
 
         /// <summary>
