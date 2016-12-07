@@ -13,7 +13,9 @@ CMD_ZIP_ARGS="-tzip"
 
 # Location where your KSP game is installed:
 #INSTALL_GAME_DIR="D:/KSP mod sandbox"
-INSTALL_GAME_DIR="D:/KSP_galileo"
+#INSTALL_GAME_DIR="D:/KSP_galileo"
+INSTALL_GAME_DIR="C:/Program Files (x86)/Steam/steamapps/common/Kerbal Space Program"
+
 
 # Change this to "yes" if you want to install the ZIP to your game after it gets made:
 # Change this to "no" if you want to suppress the install to your game and just make the ZIP only:
