@@ -9,10 +9,10 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("LaserDist")]
-[assembly: AssemblyCopyright("Copyright ©2016 Steven Mading")]
+[assembly: AssemblyCopyright("Copyright ©2016,©2017 Steven Mading")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
-[assembly: AssemblyFileVersion("0.9.4.0")]
-[assembly: AssemblyVersion("0.9.4.0")]
+[assembly: AssemblyFileVersion("1.0")]
+[assembly: AssemblyVersion("1.0")]
 [assembly: KSPAssembly("LaserDist", 0, 20)]

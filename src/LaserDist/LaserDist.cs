@@ -111,10 +111,18 @@ namespace LaserDist
         // These are settings that affect the color animation of the laser beam:
         
         private Color laserColor = new Color(1.0f,0.0f,0.0f);
-        private float laserOpacityAverage = 0.35f;
-        private float laserOpacityVariance = 0.15f;
+        private float laserOpacityAverage = 0.45f;
+        private float laserOpacityVariance = 0.20f;
         private float laserOpacityFadeMin = 0.1f; // min opacity when at max distance.
         private System.Random laserAnimationRandomizer = null;
+
+        // This varies the "wowowow" laser thickness animation:
+        private delegate float ThicknessTimeFunction(long millisec, int rand100);
+        private ThicknessTimeFunction laserWidthTimeFunction = delegate(long ms, int rand100)
+            {
+                return 0.3f + 0.2f * (Mathf.Sin(ms/200) + (rand100/100f) - 0.5f);
+            };
+        private System.Diagnostics.Stopwatch thicknessWatch;
 
 
         private GameObject lineObj = null;
@@ -122,18 +130,10 @@ namespace LaserDist
         private GameObject debuglineObj = null;
         private LineRenderer debugline = null;
         private Int32 mask;
-        private int maskBitDefault = 0;
-        private int maskTransparentFX = 1;
-        private int maskBitWater = 3;
-        private int maskBitPartsList = 8;
-        private int maskBitScaledScenery = 10;
-        private int maskBitLocalScenery = 15;
-        private int maskBitKerbals = 16;
-        private int maskBitEditorUI = 17;
-        private int maskBitDisconnectedParts = 19;
-        private int maskBitPartTriggers= 21;
-        private int maskBitWheelColliders = 27;
-        private int maskBitTerrainColliders = 28;
+        private Int32 laserFlightDrawLayer;
+        private Int32 laserMapDrawLayer;
+        private Int32 laserEditorDrawLayer;
+
 
         /// <summary>Distance the laser is showing to the first collision:</summary>
         [KSPField(isPersistant=true, guiName = "Distance", guiActive = true, guiActiveEditor = true, guiUnits = "m", guiFormat = "N2")]
@@ -281,16 +281,63 @@ namespace LaserDist
         
             SetGuiFieldsFromSettings();
 
-            mask =  (1 << maskBitDefault)
-                    + (1 << maskBitWater)
-                    + (1 << maskBitPartsList)
-                    // + (1 << maskBitScaledScenery) // seems to be the map scenery and it finds hits when not on mapview.
-                    + (1 << maskBitLocalScenery)
-                    + (1 << maskBitKerbals)
-                    + (1 << maskBitDisconnectedParts)
-                    + (1 << maskBitPartTriggers)
-                    + (1 << maskBitWheelColliders)
-                    + (1 << maskBitTerrainColliders) ;
+            bool debugShowAllMaskNames = false; // turn on to print the following after a KSP update:
+            if (debugShowAllMaskNames)
+            {
+                for (int i = 0; i < 32; i++)
+                    System.Console.WriteLine("A layer called \"" + LayerMask.LayerToName(i) + "\" exists at bit position " + i);
+            }
+            // WARNING TO ANY FUTURE MAINTAINERS ABOUT THE FOLLOWING LAYERMASK SETTING:
+            //
+            // SQUAD does not put the layer mask values into any sort of an Enum I could find.
+            // There isn't any guarantee that they'll keep the same names.  Therefore always
+            // test this again after every KSP update to see if these values have
+            // been changed or if more have been added.  LaserDist has been broken by
+            // KSP updates in the past due to this being changed.  You can use the debug
+            // printout in the lines above to see the new layer mask names after an update.
+            // 
+            // This is a bit-mask, but we don't have to do our own bit shifting to make it because
+            // Unity provides the following string-name based way to build the mask.
+            // The commented-out lines are present as a form of documentation.  It shows
+            // what we're masking off - otherwise that would be unclear because those names
+            // aren't mentioned elsewhere.
+            mask = LayerMask.GetMask(
+                "Default",    // layer number  0, which contains most physical objects that are not "scenery"
+                // "TransparentFX",    // layer number  1
+                // "Ignore Raycast",    // layer number  2
+                // "",    // layer number  3 (no name - don't know what it is)
+                "Water",    // layer number  4
+                // "UI",    // layer number  5
+                // "",    // layer number  6 (no name - don't know what it is)
+                // "",    // layer number  7 (no name - don't know what it is)
+                // "PartsList_Icons",    // layer number  8
+                // "Atmosphere",    // layer number  9
+                // "Scaled Scenery",    // layer number  10 (this is the map view planets, I think)
+                // "UIDialog",    // layer number  11
+                // "UIVectors",    // layer number  12 (i.e. lines for orbits and comm connections maybe?)
+                // "UI_Mask",    // layer number  13
+                // "Screens",    // layer number  14
+                "Local Scenery",    // layer number  15
+                // "kerbals",    // layer number  16 (presumably the hovering faces in the UI, not the 3-D in-game kerbals)
+                "EVA",    // layer number  17
+                // "SkySphere",    // layer number  18
+                "PhysicalObjects",    // layer number  19 (don't know - maybe rocks?)
+                // "Internal Space",    // layer number  20 (objects inside the cockpit in IVA view)
+                // "Part Triggers",    // layer number  21 (don't know what this is)
+                // "KerbalInstructors",    // layer number  22 (presumably the people's faces on screen?
+                // "AeroFXIgnore",    // layer number  23 (well, it says "ignore" so I will)
+                // "MapFX",    // layer number  24
+                // "UIAdditional".    // layer number  25
+                // "WheelCollidersIgnore",    // layer number  26
+                "WheelColliders",    // layer number  27
+                "TerrainColliders"    // layer number  28
+                // "DragRender"    // layer number  29
+                // "SurfaceFX"    // layer number  30
+                // "Vectors"    // layer number  31 (UI overlay for things like lift and drag display, maybe?).
+            );
+            laserFlightDrawLayer = LayerMask.NameToLayer("TransparentFX");
+            laserMapDrawLayer = LayerMask.NameToLayer("Scaled Scenery");
+            laserEditorDrawLayer = LayerMask.NameToLayer("Default");
         }
 
         public override void OnActive()
@@ -345,7 +392,7 @@ namespace LaserDist
         {
             lineObj = new GameObject("LaserDist beam");
             isOnMap = MapView.MapIsEnabled;
-            lineObj.layer = maskTransparentFX;
+            ChooseLayerBasedOnScene();
 
             line = lineObj.AddComponent<LineRenderer>();
             
@@ -357,6 +404,36 @@ namespace LaserDist
 
             laserAnimationRandomizer = new System.Random();
             bestLateUpdateHit.distance = -1f;
+
+            if (thicknessWatch != null)
+                thicknessWatch.Stop();
+            thicknessWatch = new System.Diagnostics.Stopwatch();
+            thicknessWatch.Start();
+        }
+
+        private void ChooseLayerBasedOnScene()
+        {
+            isOnMap = MapView.MapIsEnabled;
+            isInEditor = HighLogic.LoadedSceneIsEditor;
+            Int32 newMask; // holding in a local var temporarily for debug-ability, because Unity overrides the value
+                           // if it doesn't like it when you set LineObj.layer directly, making it hard to debug
+                           // what's really going on becuase there's no variable value to look at which hasn't been altered.
+            if( isInEditor )
+            {
+                newMask = laserEditorDrawLayer;
+            }
+            else if( isOnMap )
+            {
+                // Drawing the laser on the map was
+                // only enabled for the purpose of debugging.
+                // It might go away later:
+                newMask = laserMapDrawLayer;
+            }
+            else
+            {
+                newMask =  laserFlightDrawLayer;
+            }
+            lineObj.layer = newMask;
         }
         
         /// <summary>
@@ -513,10 +590,7 @@ namespace LaserDist
         /// </summary>
         public void PhysicsRaycaster()
         {
-            DebugMsg( "eraseme: PhysicsRaycaster START" );
-
             UpdatePointing();
-            
             bool switchToNewHit = false;
             RaycastHit thisLateUpdateBestHit = new RaycastHit();
             
@@ -584,7 +658,7 @@ namespace LaserDist
                 if( debugLineDraw )
                 {
                     debuglineObj = new GameObject("LaserDist debug beam");
-                    debuglineObj.layer = maskTransparentFX;
+                    debuglineObj.layer = laserFlightDrawLayer;
                     debugline = debuglineObj.AddComponent<LineRenderer>();
             
                     debugline.material = new Material(Shader.Find("Particles/Additive") );
@@ -734,22 +808,10 @@ namespace LaserDist
             {
                 Vector3d useOrigin = origin;
                 Vector3d usePointing = pointing;
-                if( isInEditor )
+                if( isOnMap )
                 {
-                    lineObj.layer = maskBitDefault;
-                }
-                else if( isOnMap )
-                {
-                    // Drawing the laser on the map was
-                    // only enabled for the purpose of debugging.
-                    // It might go away later:
-                    lineObj.layer = maskBitScaledScenery;
                     useOrigin = mapOrigin;
                     usePointing = mapPointing;
-                }
-                else
-                {
-                    lineObj.layer =  maskTransparentFX;
                 }
 
                 float width = 0.02f;
@@ -764,7 +826,7 @@ namespace LaserDist
                 c1.a = laserOpacityAverage + laserOpacityVariance * (laserAnimationRandomizer.Next(0,100) / 100f);
                 c2.a = laserOpacityFadeMin;
                 line.SetColors(c1,c2);
-                float tempWidth = width * (0.25f + (laserAnimationRandomizer.Next(0,25) / 100f));
+                float tempWidth = width * laserWidthTimeFunction(thicknessWatch.ElapsedMilliseconds, laserAnimationRandomizer.Next(0,100));
                 line.SetWidth( tempWidth, tempWidth );
             }
         }
