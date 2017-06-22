@@ -13,6 +13,6 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
-[assembly: AssemblyFileVersion("1.0")]
-[assembly: AssemblyVersion("1.0")]
-[assembly: KSPAssembly("LaserDist", 0, 20)]
+[assembly: AssemblyFileVersion("1.0.1")]
+[assembly: AssemblyVersion("1.0.1")]
+[assembly: KSPAssembly("LaserDist", 1, 0)]
