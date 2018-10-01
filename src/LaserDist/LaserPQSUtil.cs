@@ -72,6 +72,11 @@ namespace LaserDist
         private int slices;
         /// <summary>has a hit already been found and it's just being narrowed down more precisely?</summary>
         private bool honingSuccess;
+        /// <summary>
+        /// In the current pass through the PQS checker, has it ever hit a spot above ground since it emitted from
+        /// the front of the laser yet?  Any "below" ground hits it finds before that has happened "don't count":
+        /// </summary>
+        private bool pqsAboveGroundYet;
         
         /// <summary>For measuring how long the current raycast solve chunk has been going.</summary>
         private System.Diagnostics.Stopwatch rayCastTimer;
@@ -140,6 +145,7 @@ namespace LaserDist
         {
             UpdateAge = 0;
             this.honingSuccess = false;
+            this.pqsAboveGroundYet = false;
         }
 
         /// <summary>
@@ -180,7 +186,7 @@ namespace LaserDist
                 bool success = false;
                 DebugMsg( "Starting continuation numericPQSolver");
                 success = numericPQSSolver(
-                    out terrainDist, out done, this.hitBody, this.origin, this.pointingUnitVec, this.dist, defaultSlices );
+                    out terrainDist, out done, ref this.pqsAboveGroundYet, this.hitBody, this.origin, this.pointingUnitVec, this.dist, defaultSlices );
                 hitBody = this.hitBody;
                 if( success && done)
                 {
@@ -223,7 +229,7 @@ namespace LaserDist
                     Vector3d closerOrigin = origin + distanceLowerBound*pointingUnitVec;
 
                     success = numericPQSSolver(
-                        out terrainDist, out done, hitBody, closerOrigin, pointingUnitVec, distanceUpperBound, defaultSlices );
+                        out terrainDist, out done, ref this.pqsAboveGroundYet, hitBody, closerOrigin, pointingUnitVec, distanceUpperBound, defaultSlices);
                     if( success && done )
                     {
                         didHit = true;
@@ -384,11 +390,12 @@ namespace LaserDist
         private bool numericPQSSolver(
             out double newDist,
             out bool done,
+            ref bool hasBeenAboveGroundYet,
             CelestialBody hitBody,
             Vector3d origin,
             Vector3d pointingUnitVec,
             double dist,
-            int slices )
+            int slices)
         {
             // Some bodies have no PQS collider - like the sun.  For them they have no surface and this doesn't work:
             if (hitBody.pqsController == null)
@@ -406,6 +413,7 @@ namespace LaserDist
             double lat;
             double lng;
             double segmentLength = 0.0;
+
             newDist = dist;
             int slicesThisTime = slices;
             Vector3d samplePoint = origin;
@@ -419,8 +427,9 @@ namespace LaserDist
             }
             else
             {
-                // We already know i=0 is above ground, so start at i=1:
-                for( i = 1 ; i <= slicesThisTime ; ++i )
+                // Note: i = 0 might start "below" ground because polygon approximation to PQS could
+                // have us resting atop a terrain polygon that is already "below" PQS altitude:
+                for( i = 0 ; i <= slicesThisTime ; ++i )
                 {
                     prevSamplePoint = samplePoint;
                     samplePoint = origin + (i*(dist/slicesThisTime))*pointingUnitVec;
@@ -438,17 +447,43 @@ namespace LaserDist
                 
                     if( samplePointAlt <= groundAlt || (hasOcean && samplePointAlt < 0) )
                     {
-                        DebugMsg( "Found a below ground: samplePointAlt="+samplePointAlt + ", groundAlt="+groundAlt );
-                        success = true;
-                        this.honingSuccess = true;
-                        double subSectionDist;
-                        bool subDone;
-                        numericPQSSolver( out subSectionDist, out subDone, hitBody, prevSamplePoint, pointingUnitVec,
-                                          segmentLength, slices );
-                        continueNextTime = ! subDone;
-                        newDist = ((i-1)*(dist/slicesThisTime)) + subSectionDist;
-                        break;
+                        if( hasBeenAboveGroundYet )
+                        {
+                            DebugMsg("Found a below ground: samplePointAlt=" + samplePointAlt + ", groundAlt=" + groundAlt);
+                            success = true;
+                            this.honingSuccess = true;
+                            double subSectionDist;
+                            bool subDone;
+                            numericPQSSolver(out subSectionDist, out subDone, ref hasBeenAboveGroundYet, hitBody, prevSamplePoint, pointingUnitVec,
+                                segmentLength, slices);
+                            continueNextTime = !subDone;
+                            newDist = ((i - 1) * (dist / slicesThisTime)) + subSectionDist;
+                            break;
+                        }
                     }
+                    else
+                    {
+                        // This silly check is to handle the weird case where the terrain polygons
+                        // are underneath the PQS idealized terrain altitude, like so:
+                        //
+                        //         *****   
+                        //      ***     *****<------- PQS ideal curve
+                        //    **            *****      
+                        //   **------------------***   
+                        //  *   actual terrain      **
+                        //**       polygon            **
+                        //
+                        // When this happens, the laser can *start off* already below PQS altitude
+                        // if it is part of a vehicle sitting on the actual terrain polygon.
+                        // That first "hit" this algorithm finds as it starts below PQS terrain
+                        // causes a "phantom" terrain hit if it's not explicitly exluded.. this
+                        // flag, carried recursively through all the steps, will notice when the
+                        // first point that was above PQS was encountered.  Until that happens,
+                        // any "below ground" hits are fake and need to be ignored:
+                        //
+                        hasBeenAboveGroundYet = true;
+                    }
+
                     if( rayCastTimer.Elapsed.TotalMilliseconds > millisecondCap )
                     {
                         DebugMsg( "Ran out of milliseconds: " + rayCastTimer.Elapsed.TotalMilliseconds + " > " + millisecondCap );
@@ -480,8 +515,8 @@ namespace LaserDist
                     //                     sample points
                     bool subDone = false;
                     DebugMsg( "numericPQSSolver recursing.");
-                    success = numericPQSSolver( out newDist, out subDone, hitBody, origin, pointingUnitVec,
-                                                dist, 2*slices );
+                    success = numericPQSSolver( out newDist, out subDone, ref hasBeenAboveGroundYet, hitBody, origin, pointingUnitVec,
+                        dist, 2*slices);
                     continueNextTime = ! subDone;
                 }
             }
