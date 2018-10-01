@@ -11,10 +11,13 @@
 CMD_ZIP="C:/Program Files/7-Zip/7z.exe"
 CMD_ZIP_ARGS="-tzip"
 
+#MODE="Debug"
+MODE="Release"
+
 # Location where your KSP game is installed:
 #INSTALL_GAME_DIR="D:/KSP mod sandbox"
-INSTALL_GAME_DIR="D:/KSP_galileo"
-#INSTALL_GAME_DIR="C:/Program Files (x86)/Steam/steamapps/common/Kerbal Space Program"
+#INSTALL_GAME_DIR="D:/KSP_galileo"
+INSTALL_GAME_DIR="D:/SteamLibrary_2/steamapps/common/Kerbal Space Program"
 
 
 # Change this to "yes" if you want to install the ZIP to your game after it gets made:
@@ -51,7 +54,7 @@ cp  LICENSE              "${EXPORT_DIR}/${MOD_NAME}"
 cp -r Parts "${EXPORT_DIR}/${MOD_NAME}/"
 cp -r LaserDist.version "${EXPORT_DIR}/${MOD_NAME}/"
 mkdir "${EXPORT_DIR}/${MOD_NAME}/Plugins"
-cp -r src/LaserDist/bin/Debug/LaserDist.dll "${EXPORT_DIR}/${MOD_NAME}/Plugins"
+cp -r src/LaserDist/bin/${MODE}/LaserDist.dll "${EXPORT_DIR}/${MOD_NAME}/Plugins"
 "$CMD_ZIP" "$CMD_ZIP_ARGS" a "${MOD_NAME}.zip" "${EXPORT_DIR}"
 
 if [ "$DO_INSTALL" = "yes" ]

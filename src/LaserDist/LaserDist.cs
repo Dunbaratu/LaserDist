@@ -143,6 +143,9 @@ namespace LaserDist
         [KSPField(isPersistant=true, guiName = "Hit", guiActive = true, guiActiveEditor = true)]
         public string HitName = "<none>";
 
+        [KSPField(isPersistant=true, guiName = "Layer", guiActive = true, guiActiveEditor = true)]
+        public string HitLayer = "<none>"; // for debug reasons
+
         /// <summary>Distance the laser is checking to the first collision:</summary>
         [KSPField(isPersistant=true, guiName = "Max Sensor Range", guiActive = true, guiActiveEditor = true, guiUnits = "m")]
         public float MaxDistance = 10000f;        
@@ -691,6 +694,7 @@ namespace LaserDist
             UpdatePointing();
             
             HitName = "<none>";
+            HitLayer = "<none>";
             if( hasPower && Activated && origin != null && pointing != null )
             {
                 // the points on the map-space corresponding to these points is different:
@@ -703,14 +707,15 @@ namespace LaserDist
                     UpdateAge = updateForcedResultAge;
                     
                     RaycastHit hit = bestLateUpdateHit;
-
                     newDist = hit.distance;
-                    
+
                     // Walk up the UnityGameObject tree trying to find an object that is
                     // something the user will be familiar with:
                     GameObject hitObject = (hit.transform == null ? null : hit.transform.gameObject);
                     if( hitObject != null )
                     {
+                        HitLayer = LayerMask.LayerToName(hitObject.layer); // for debug reasons
+
                         HitName = hitObject.name; // default if the checks below don't work.
 
                         // Despite the name and what the Unity documentation says,
@@ -769,7 +774,17 @@ namespace LaserDist
                             if( pqsDist < newDist || newDist < 0 )
                             {
                                 HitName = pqsBody.name;
-                                newDist = (float) pqsDist;
+                                // Ignore any hit closer than 2km as probably bogus "vessel below PQS" hit:
+                                // (it's possible for the actual terrain polygons to approximate the PQS curve
+                                // in a way where the vessel sits "under" the PQS predicted altitude despite
+                                // being above the polygon - that generates a bogus "hit terrain" false positive
+                                // as the line goes from "under" the terrain to "above" it.  The PQS systen should
+                                // not need to be queried for nearby terrain, so if there isn't a nearby real raycast
+                                // hit, then don't believe it when PQS claims there is one:
+                                if (pqsDist >= 2000)
+                                {
+                                    newDist = (float)pqsDist;
+                                }
                             }
                         }
                     }
@@ -784,7 +799,12 @@ namespace LaserDist
                             {
                                 DebugMsg( "      prevsuccess." );
                                 HitName = pqsTool.PrevBodyName;
-                                newDist = (float) pqsTool.PrevDist;
+                                // Ignore any hit closer than 2km as probably bogus "vessel below PQS" hit:
+                                // (see comment above in the "if" about this.)
+                                if( pqsTool.PrevDist >= 2000 )
+                                {
+                                    newDist = (float)pqsTool.PrevDist;
+                                }
                             }
                         }
                     }
