@@ -71,3 +71,10 @@ else
   echo "Skipping Install Step."
   echo "----------------------"
 fi
+
+echo " -- -- -- -- -- -- -- -- -- -- -- -- -- -- --"
+echo " $MODE   $MODE    $MODE     $MODE"
+echo " -- -- -- -- -- -- -- -- -- -- -- -- -- -- --"
+echo "Zip file was made using the $MODE DLL.  NOTICE!  I Said $MODE"
+echo " -- -- -- -- -- -- -- -- -- -- -- -- -- -- --"
+

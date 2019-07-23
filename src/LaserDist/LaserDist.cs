@@ -27,7 +27,7 @@ namespace LaserDist
     /// </summary>
     public class LaserDistModule : PartModule
     {
-        private bool debugMsg = false;
+        private bool debugMsg = true;
         private bool debugLineDraw = false;
 
         /// <summary>
@@ -231,7 +231,9 @@ namespace LaserDist
             field = Fields["BendX"];
             ((UI_FloatRange)field.uiControlEditor).minValue = -MaxBendX;
             ((UI_FloatRange)field.uiControlEditor).maxValue = MaxBendX;
-            if( MaxBendX == 0f )
+            ((UI_FloatRange)field.uiControlFlight).minValue = -MaxBendX;
+            ((UI_FloatRange)field.uiControlFlight).maxValue = MaxBendX;
+            if ( MaxBendX == 0f )
             {   field.guiActive = false;
                 field.guiActiveEditor = false;
             }
@@ -243,7 +245,9 @@ namespace LaserDist
             field = Fields["BendY"];
             ((UI_FloatRange)field.uiControlEditor).minValue = -MaxBendY;
             ((UI_FloatRange)field.uiControlEditor).maxValue = MaxBendY;
-            if( MaxBendY == 0f )
+            ((UI_FloatRange)field.uiControlFlight).minValue = -MaxBendY;
+            ((UI_FloatRange)field.uiControlFlight).maxValue = MaxBendY;
+            if ( MaxBendY == 0f )
             {   field.guiActive = false;
                 field.guiActiveEditor = false;
             }
