@@ -1,6 +1,13 @@
 Changes per version for LaserDist (in reverse order)
 ======================================================
 
+v1.3.0 Just version updates
+---------------------------
+
+Between v0.9.2 and now, all changes have merely been for KSP version
+updates that altered parts of the API and required LaserDist to adjust
+to the new API alls.
+
 v0.9.2  Just Small Visual Bug Fixes
 -----------------------------------
 

@@ -401,12 +401,17 @@ namespace LaserDist
             isOnMap = MapView.MapIsEnabled;
             ChooseLayerBasedOnScene();
 
+            Shader vecShader = Shader.Find("Particles/Alpha Blended"); // for when KSP version is < 1.8
+            if (vecShader == null)
+                vecShader = Shader.Find("Legacy Shaders/Particles/Alpha Blended"); // for when KSP version is >= 1.8
+
             line = lineObj.AddComponent<LineRenderer>();
             
-            line.material = new Material(Shader.Find("Particles/Additive") );
+            line.material = new Material(vecShader);
             Color c1 = laserColor;
             Color c2 = laserColor;
-            line.SetColors( c1, c2 );
+            line.startColor = c1;
+            line.endColor = c2;
             line.enabled = true;
 
             laserAnimationRandomizer = new System.Random();
@@ -577,8 +582,8 @@ namespace LaserDist
             {
                 if( Activated )
                 {
-                    float drainThisUpdate = (float) (ElectricPerSecond * deltaTime);
-                    float actuallyUsed = part.RequestResource( "ElectricCharge", drainThisUpdate );
+                    double drainThisUpdate = ElectricPerSecond * deltaTime;
+                    double actuallyUsed = part.RequestResource( "ElectricCharge", (double)drainThisUpdate ); 
                     if( actuallyUsed < drainThisUpdate/2.0 )
                     {
                         hasPower = false;
@@ -671,9 +676,11 @@ namespace LaserDist
                     debugline.material = new Material(Shader.Find("Particles/Additive") );
                     Color c1 = new Color(1.0f,0.0f,1.0f);
                     Color c2 = c1;
-                    debugline.SetColors( c1, c2 );
+                    debugline.startColor = c1;
+                    debugline.endColor = c2;
                     debugline.enabled = true;
-                    debugline.SetWidth(0.01f,0.01f);
+                    debugline.startWidth = 0.01f;
+                    debugline.endWidth = 0.01f;
                     debugline.SetPosition( 0, origin );
                     debugline.SetPosition( 1, origin + pointing*thisLateUpdateBestHit.distance );
                 }
@@ -840,7 +847,7 @@ namespace LaserDist
 
                 float width = 0.02f;
 
-                line.SetVertexCount(2);
+                line.positionCount = 2;
                 line.SetPosition( 0, useOrigin );
                 line.SetPosition( 1, useOrigin + usePointing*( (Distance>0)?Distance:MaxDistance ) );
 
@@ -849,9 +856,11 @@ namespace LaserDist
                 Color c2 = laserColor;
                 c1.a = laserOpacityAverage + laserOpacityVariance * (laserAnimationRandomizer.Next(0,100) / 100f);
                 c2.a = laserOpacityFadeMin;
-                line.SetColors(c1,c2);
+                line.startColor = c1;
+                line.endColor = c2;
                 float tempWidth = width * laserWidthTimeFunction(thicknessWatch.ElapsedMilliseconds, laserAnimationRandomizer.Next(0,100));
-                line.SetWidth( tempWidth, tempWidth );
+                line.startWidth = tempWidth;
+                line.endWidth  = tempWidth;
             }
         }
         
